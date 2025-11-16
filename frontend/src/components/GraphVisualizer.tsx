@@ -98,9 +98,33 @@ const cytoscapeStylesheet = [
   },
 ];
 
-export default function GraphVisualizer() {
+interface Props {
+  onNodeSelect?: (nodeId: string | null) => void;
+  selectedNodeId?: string | null;
+}
+
+export default function GraphVisualizer({ onNodeSelect, selectedNodeId: externalSelectedNodeId }: Props) {
   const cyRef = useRef<Core | null>(null);
-  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [isReady, setIsReady] = useState<boolean>(false);
+  const setupDoneRef = useRef<boolean>(false);
+  const onNodeSelectRef = useRef(onNodeSelect);
+  const [internalSelectedNodeId, setInternalSelectedNodeId] = useState<string | null>(null);
+  
+  // Keep the ref updated with the latest callback
+  useEffect(() => {
+    onNodeSelectRef.current = onNodeSelect;
+  }, [onNodeSelect]);
+  
+  // Use external selectedNodeId if provided, otherwise use internal state
+  const selectedNodeId = externalSelectedNodeId !== undefined ? externalSelectedNodeId : internalSelectedNodeId;
+  
+  const setSelectedNodeId = (id: string | null) => {
+    if (onNodeSelectRef.current) {
+      onNodeSelectRef.current(id);
+    } else {
+      setInternalSelectedNodeId(id);
+    }
+  };
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['graph', 'full'],
@@ -114,18 +138,26 @@ export default function GraphVisualizer() {
   const elements = data
     ? [
         // Nodes
-        ...data.nodes.map((node: GraphNode) => ({
-          data: {
-            id: node.id,
-            label: node.text
-              ? node.text.substring(0, 30) + (node.text.length > 30 ? '...' : '')
-              : node.title
-              ? node.title.substring(0, 30) + (node.title.length > 30 ? '...' : '')
-              : node.id.substring(0, 8),
-            type: node.type,
-            ...node,
-          },
-        })),
+        ...data.nodes.map((node: GraphNode) => {
+          // Determine label based on node type
+          let label = node.id.substring(0, 8);
+          if (node.text) {
+            label = node.text.substring(0, 30) + (node.text.length > 30 ? '...' : '');
+          } else if (node.title) {
+            label = node.title.substring(0, 30) + (node.title.length > 30 ? '...' : '');
+          } else if (node.name) {
+            label = node.name.substring(0, 30) + (node.name.length > 30 ? '...' : '');
+          }
+          
+          return {
+            data: {
+              id: node.id,
+              label,
+              type: node.type,
+              ...node,
+            },
+          };
+        }),
         // Edges
         ...data.edges.map((edge: GraphEdge) => ({
           data: {
@@ -139,38 +171,66 @@ export default function GraphVisualizer() {
       ]
     : [];
 
-  // Handle node click
+  // Set up tap handler when Cytoscape instance and data are ready
   useEffect(() => {
-    if (cyRef.current) {
-      const cy = cyRef.current;
+    const cy = cyRef.current;
+    if (!cy || cy.destroyed() || !data || !isReady) {
+      console.log('Tap handler setup skipped:', { cy: !!cy, destroyed: cy?.destroyed(), data: !!data, isReady }); // Debug log
+      return;
+    }
 
-      const handleTap = (event: cytoscape.EventObject) => {
+    console.log('Setting up tap handler'); // Debug log
+
+    const handleTap = (event: cytoscape.EventObject) => {
+      try {
         const target = event.target;
+        console.log('Tap event fired, target:', target); // Debug log
         if (target.isNode()) {
           const nodeId = target.id();
+          console.log('Node tapped:', nodeId); // Debug log
           setSelectedNodeId(nodeId);
           // Highlight selected node and its neighbors
-          cy.elements().removeClass('highlighted');
-          target.addClass('highlighted');
-          target.neighborhood().addClass('highlighted');
+          if (!cy.destroyed()) {
+            cy.elements().removeClass('highlighted');
+            target.addClass('highlighted');
+            target.neighborhood().addClass('highlighted');
+          }
         } else {
+          console.log('Background tapped, deselecting'); // Debug log
           setSelectedNodeId(null);
-          cy.elements().removeClass('highlighted');
+          if (!cy.destroyed()) {
+            cy.elements().removeClass('highlighted');
+          }
         }
-      };
+      } catch (error) {
+        console.warn('Error handling tap event:', error);
+      }
+    };
 
-      cy.on('tap', handleTap);
+    // Remove any existing tap handlers first to avoid duplicates
+    cy.off('tap');
+    cy.on('tap', handleTap);
+    console.log('Tap handler attached'); // Debug log
 
-      return () => {
-        cy.off('tap', handleTap);
-      };
-    }
-  }, [data]);
+    return () => {
+      if (cy && !cy.destroyed()) {
+        try {
+          cy.off('tap', handleTap);
+          console.log('Tap handler removed'); // Debug log
+        } catch (error) {
+          console.warn('Error removing tap handler:', error);
+        }
+      }
+    };
+  }, [data, isReady]); // setSelectedNodeId uses ref, so no need in deps
 
   // Add highlight styles
   useEffect(() => {
-    if (cyRef.current) {
-      cyRef.current.style().append([
+    const cy = cyRef.current;
+    if (!cy || !isReady || cy.destroyed()) return;
+
+    try {
+      cy.style().append([
         {
           selector: '.highlighted',
           style: {
@@ -190,7 +250,25 @@ export default function GraphVisualizer() {
           },
         },
       ]);
+    } catch (error) {
+      console.warn('Failed to append highlight styles:', error);
     }
+  }, []);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      const cy = cyRef.current;
+      if (cy && !cy.destroyed()) {
+        try {
+          cy.destroy();
+        } catch (error) {
+          console.warn('Error destroying Cytoscape instance:', error);
+        }
+      }
+      setIsReady(false);
+      setupDoneRef.current = false;
+    };
   }, []);
 
   if (isLoading) {
@@ -244,8 +322,13 @@ export default function GraphVisualizer() {
         <div className="flex items-center gap-2">
           <button
             onClick={() => {
-              if (cyRef.current) {
-                cyRef.current.fit();
+              const cy = cyRef.current;
+              if (cy && !cy.destroyed() && isReady) {
+                try {
+                  cy.fit();
+                } catch (error) {
+                  console.warn('Failed to fit graph:', error);
+                }
               }
             }}
             className="px-3 py-1 text-xs bg-white border rounded hover:bg-gray-50"
@@ -255,8 +338,13 @@ export default function GraphVisualizer() {
           </button>
           <button
             onClick={() => {
-              if (cyRef.current) {
-                cyRef.current.reset();
+              const cy = cyRef.current;
+              if (cy && !cy.destroyed() && isReady) {
+                try {
+                  cy.reset();
+                } catch (error) {
+                  console.warn('Failed to reset graph:', error);
+                }
               }
             }}
             className="px-3 py-1 text-xs bg-white border rounded hover:bg-gray-50"
@@ -299,8 +387,7 @@ export default function GraphVisualizer() {
           stylesheet={cytoscapeStylesheet}
           layout={{
             name: 'cose',
-            animate: true,
-            animationDuration: 1000,
+            animate: false, // Disable animation to prevent race conditions
             idealEdgeLength: 100,
             nodeRepulsion: 4500,
             nestingFactor: 0.1,
@@ -316,58 +403,108 @@ export default function GraphVisualizer() {
           }}
           style={{ width: '100%', height: '100%' }}
           cy={(cy) => {
+            if (!cy) {
+              setIsReady(false);
+              setupDoneRef.current = false;
+              return;
+            }
+            
+            // Guard against destroyed instances
+            if (cy.destroyed()) {
+              setIsReady(false);
+              setupDoneRef.current = false;
+              return;
+            }
+
+            // Prevent multiple setups if already done
+            if (setupDoneRef.current && cyRef.current === cy) {
+              console.log('Already set up, skipping'); // Debug log
+              // Don't reset isReady if already set up
+              return;
+            }
+
             cyRef.current = cy;
-            // Enable pan and zoom
-            cy.userPanningEnabled(true);
-            cy.boxSelectionEnabled(true);
-            cy.zoomingEnabled(true);
-            cy.minZoom(0.1);
-            cy.maxZoom(2);
+            // Only reset isReady if we're doing a fresh setup
+            if (!setupDoneRef.current) {
+              setIsReady(false);
+              console.log('Resetting isReady to false for new setup'); // Debug log
+            }
+
+            // Set up event listeners and configuration
+            const setupCytoscape = () => {
+              try {
+                console.log('setupCytoscape called', { destroyed: cy.destroyed(), setupDone: setupDoneRef.current }); // Debug log
+                if (cy.destroyed() || setupDoneRef.current) {
+                  console.log('setupCytoscape skipped - already done or destroyed'); // Debug log
+                  return;
+                }
+
+                // Enable pan and zoom
+                cy.userPanningEnabled(true);
+                cy.boxSelectionEnabled(true);
+                cy.zoomingEnabled(true);
+                cy.minZoom(0.1);
+                cy.maxZoom(2);
+
+                // Note: Tap handler is set up in useEffect when data is ready
+
+                setupDoneRef.current = true;
+                console.log('setupDoneRef set to true'); // Debug log
+
+                // Mark as ready immediately since we've set up the instance
+                // The ready event will also fire, but we can mark ready now
+                setIsReady(true);
+                console.log('Cytoscape instance marked as ready immediately'); // Debug log
+              } catch (error) {
+                console.warn('Error setting up Cytoscape:', error);
+                setIsReady(false);
+                setupDoneRef.current = false;
+              }
+            };
+
+            // Listen for ready event (only once)
+            if (!setupDoneRef.current) {
+              console.log('Setting up ready handler'); // Debug log
+              const readyHandler = () => {
+                console.log('Ready event fired'); // Debug log
+                // Ensure ready state is set when ready event fires
+                if (!cy.destroyed() && cy === cyRef.current) {
+                  setIsReady(true);
+                  console.log('Ready event: marking instance as ready'); // Debug log
+                }
+              };
+
+              cy.on('ready', readyHandler);
+              
+              // Also set up immediately if already ready
+              try {
+                if (cy.container()) {
+                  console.log('Container exists, calling setupCytoscape immediately'); // Debug log
+                  setupCytoscape();
+                } else {
+                  console.log('No container yet, scheduling setupCytoscape'); // Debug log
+                  // Fallback: set up after a short delay
+                  setTimeout(() => {
+                    if (!cy.destroyed() && cy === cyRef.current) {
+                      setupCytoscape();
+                    }
+                  }, 150);
+                }
+              } catch (error) {
+                console.log('Container check failed, using timeout fallback', error); // Debug log
+                // If container check fails, use timeout fallback
+                setTimeout(() => {
+                  if (!cy.destroyed() && cy === cyRef.current) {
+                    setupCytoscape();
+                  }
+                }, 150);
+              }
+            } else {
+              console.log('setupDoneRef already true, skipping setup'); // Debug log
+            }
           }}
         />
 
-        {/* Node Details Panel */}
-        {selectedNodeId && (
-          <div className="absolute top-4 right-4 bg-white border rounded-lg shadow-lg p-4 max-w-xs z-10">
-            <div className="flex justify-between items-start mb-2">
-              <h4 className="font-semibold text-sm">Node Details</h4>
-              <button
-                onClick={() => setSelectedNodeId(null)}
-                className="text-gray-400 hover:text-gray-600"
-              >
-                ×
-              </button>
-            </div>
-            {data.nodes.find((n: GraphNode) => n.id === selectedNodeId) && (
-              <div className="text-xs space-y-1">
-                <div>
-                  <span className="text-gray-500">ID:</span>{' '}
-                  <span className="font-mono">{selectedNodeId.substring(0, 12)}...</span>
-                </div>
-                <div>
-                  <span className="text-gray-500">Type:</span>{' '}
-                  {data.nodes.find((n: GraphNode) => n.id === selectedNodeId)?.type}
-                </div>
-                {data.nodes.find((n: GraphNode) => n.id === selectedNodeId)?.text && (
-                  <div className="mt-2 pt-2 border-t">
-                    <div className="text-gray-500 mb-1">Content:</div>
-                    <div className="text-gray-700">
-                      {data.nodes.find((n: GraphNode) => n.id === selectedNodeId)?.text}
-                    </div>
-                  </div>
-                )}
-                {data.nodes.find((n: GraphNode) => n.id === selectedNodeId)?.title && (
-                  <div className="mt-2 pt-2 border-t">
-                    <div className="text-gray-500 mb-1">Title:</div>
-                    <div className="text-gray-700">
-                      {data.nodes.find((n: GraphNode) => n.id === selectedNodeId)?.title}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        )}
       </div>
     </div>
   );

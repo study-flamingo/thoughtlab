@@ -1,11 +1,17 @@
 from fastapi import APIRouter, HTTPException
 from app.models.nodes import (
     ObservationCreate,
+    ObservationUpdate,
     ObservationResponse,
     SourceCreate,
+    SourceUpdate,
     SourceResponse,
     HypothesisCreate,
+    HypothesisUpdate,
     HypothesisResponse,
+    EntityCreate,
+    EntityUpdate,
+    EntityResponse,
     RelationshipCreate,
     RelationshipResponse,
 )
@@ -38,11 +44,29 @@ async def get_all_observations(limit: int = 100):
     return {"nodes": observations}
 
 
+@router.put("/observations/{node_id}", response_model=dict)
+async def update_observation(node_id: str, data: ObservationUpdate):
+    """Update an observation node"""
+    success = await graph_service.update_observation(node_id, data)
+    if not success:
+        raise HTTPException(status_code=404, detail="Observation not found or no changes provided")
+    return {"id": node_id, "message": "Observation updated"}
+
+
 @router.post("/sources", response_model=dict)
 async def create_source(data: SourceCreate):
     """Create a new source node"""
     node_id = await graph_service.create_source(data)
     return {"id": node_id, "message": "Source created"}
+
+
+@router.put("/hypotheses/{node_id}", response_model=dict)
+async def update_hypothesis(node_id: str, data: HypothesisUpdate):
+    """Update a hypothesis node"""
+    success = await graph_service.update_hypothesis(node_id, data)
+    if not success:
+        raise HTTPException(status_code=404, detail="Hypothesis not found or no changes provided")
+    return {"id": node_id, "message": "Hypothesis updated"}
 
 
 @router.post("/hypotheses", response_model=dict)
@@ -52,11 +76,20 @@ async def create_hypothesis(data: HypothesisCreate):
     return {"id": node_id, "message": "Hypothesis created"}
 
 
-@router.get("/{node_id}/connections", response_model=dict)
-async def get_connections(node_id: str, max_depth: int = 2):
-    """Get all connections for a node"""
-    connections = await graph_service.get_node_connections(node_id, max_depth)
-    return {"node_id": node_id, "connections": connections}
+@router.put("/entities/{node_id}", response_model=dict)
+async def update_entity(node_id: str, data: EntityUpdate):
+    """Update an entity node"""
+    success = await graph_service.update_entity(node_id, data)
+    if not success:
+        raise HTTPException(status_code=404, detail="Entity not found or no changes provided")
+    return {"id": node_id, "message": "Entity updated"}
+
+
+@router.post("/entities", response_model=dict)
+async def create_entity(data: EntityCreate):
+    """Create a new entity node"""
+    node_id = await graph_service.create_entity(data)
+    return {"id": node_id, "message": "Entity created"}
 
 
 @router.post("/relationships", response_model=dict)
@@ -77,3 +110,19 @@ async def create_relationship(data: RelationshipCreate):
             detail="Could not create relationship. Check that both nodes exist."
         )
     return {"message": "Relationship created"}
+
+
+@router.get("/{node_id}/connections", response_model=dict)
+async def get_connections(node_id: str, max_depth: int = 2):
+    """Get all connections for a node"""
+    connections = await graph_service.get_node_connections(node_id, max_depth)
+    return {"node_id": node_id, "connections": connections}
+
+
+@router.get("/{node_id}", response_model=dict)
+async def get_node(node_id: str):
+    """Get any node by ID"""
+    node = await graph_service.get_node(node_id)
+    if not node:
+        raise HTTPException(status_code=404, detail="Node not found")
+    return node

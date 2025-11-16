@@ -12,6 +12,8 @@ export default function CreateNodeModal({ onClose }: Props) {
   const [confidence, setConfidence] = useState(0.8);
   const [title, setTitle] = useState('');
   const [url, setUrl] = useState('');
+  const [entityName, setEntityName] = useState('');
+  const [entityDescription, setEntityDescription] = useState('');
 
   const queryClient = useQueryClient();
 
@@ -23,12 +25,25 @@ export default function CreateNodeModal({ onClose }: Props) {
     },
   });
 
+  const createEntityMutation = useMutation({
+    mutationFn: graphApi.createEntity,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['graph'] });
+      onClose();
+    },
+  });
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (nodeType === 'observation') {
       createObservationMutation.mutate({ text, confidence });
+    } else if (nodeType === 'entity') {
+      createEntityMutation.mutate({ 
+        name: entityName, 
+        description: entityDescription || undefined 
+      });
     }
-    // TODO: Handle other node types
+    // TODO: Handle other node types (hypothesis, source, concept)
   };
 
   return (
@@ -130,6 +145,35 @@ export default function CreateNodeModal({ onClose }: Props) {
             </>
           )}
 
+          {nodeType === 'entity' && (
+            <>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Entity Name
+                </label>
+                <input
+                  type="text"
+                  value={entityName}
+                  onChange={(e) => setEntityName(e.target.value)}
+                  className="w-full border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Enter entity name..."
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Description (optional)
+                </label>
+                <textarea
+                  value={entityDescription}
+                  onChange={(e) => setEntityDescription(e.target.value)}
+                  className="w-full border rounded-md px-3 py-2 h-32 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Describe the entity..."
+                />
+              </div>
+            </>
+          )}
+
           <div className="flex justify-end gap-3 pt-4">
             <button
               type="button"
@@ -140,10 +184,10 @@ export default function CreateNodeModal({ onClose }: Props) {
             </button>
             <button
               type="submit"
-              disabled={createObservationMutation.isPending}
+              disabled={createObservationMutation.isPending || createEntityMutation.isPending}
               className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              {createObservationMutation.isPending ? 'Creating...' : 'Create Node'}
+              {(createObservationMutation.isPending || createEntityMutation.isPending) ? 'Creating...' : 'Create Node'}
             </button>
           </div>
         </form>

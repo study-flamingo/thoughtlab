@@ -13,7 +13,37 @@ A web-based research application that helps you discover meaningful connections 
 
 ## Quickstart
 
-Get the app running in 3 steps:
+### Option 1: Automated Setup (Recommended)
+
+**One command setup:**
+
+```bash
+# Linux/Mac/WSL
+./scripts/setup.sh
+
+# Windows (PowerShell)
+.\scripts\setup.ps1
+```
+
+This will:
+- ✅ Start Docker services
+- ✅ Set up Python virtual environment
+- ✅ Install all dependencies
+- ✅ Create and configure `.env` files
+- ✅ Initialize Neo4j database
+
+**Then start the app:**
+
+```bash
+# Linux/Mac/WSL
+./scripts/start.sh
+
+# Or manually in two terminals:
+# Terminal 1: cd backend && source .venv/bin/activate && uvicorn app.main:app --reload
+# Terminal 2: cd frontend && npm run dev
+```
+
+### Option 2: Manual Setup
 
 1. **Start databases:**
    ```bash
@@ -22,9 +52,9 @@ Get the app running in 3 steps:
 
 2. **Start backend** (in `backend/` directory):
    ```bash
-   python3 -m venv venv
-   source venv/bin/activate
-   pip install -r requirements.txt
+   uv venv  # Creates .venv (uv's default)
+   source .venv/bin/activate
+   uv pip install -r requirements.txt
    cp .env.example .env  # Edit .env with your SECRET_KEY
    uvicorn app.main:app --reload
    ```
@@ -64,14 +94,14 @@ All services should show "healthy" status. This may take 30-60 seconds on first 
 ```bash
 cd backend
 
-# Create virtual environment
-python3 -m venv venv
+# Create virtual environment (uv defaults to .venv)
+uv venv
 
 # Activate virtual environment
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 
 # Install dependencies
-pip install -r requirements.txt
+uv pip install -r requirements.txt
 
 # Create .env file (if not exists)
 cp .env.example .env
@@ -271,7 +301,7 @@ thoughtlab/
 
 ```bash
 cd backend
-source venv/bin/activate
+source .venv/bin/activate
 pytest
 
 # With coverage
@@ -341,8 +371,8 @@ lsof -i :8000
 - Wait 30-60 seconds after starting Docker services
 
 **Import errors:**
-- Make sure virtual environment is activated: `source venv/bin/activate`
-- Reinstall dependencies: `pip install -r requirements.txt`
+- Make sure virtual environment is activated: `source .venv/bin/activate`
+- Reinstall dependencies: `uv pip install -r requirements.txt`
 
 ### Frontend Issues
 
@@ -391,7 +421,7 @@ docker-compose up -d
 2. **Start backend** (Terminal 1):
    ```bash
    cd backend
-   source venv/bin/activate
+   source .venv/bin/activate
    uvicorn app.main:app --reload
    ```
 

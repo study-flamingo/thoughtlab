@@ -1,11 +1,17 @@
 from app.db.neo4j import neo4j_conn
 from app.models.nodes import (
     ObservationCreate,
+    ObservationUpdate,
     ObservationResponse,
     SourceCreate,
+    SourceUpdate,
     SourceResponse,
     HypothesisCreate,
+    HypothesisUpdate,
     HypothesisResponse,
+    EntityCreate,
+    EntityUpdate,
+    EntityResponse,
     RelationshipCreate,
     RelationshipType,
 )
@@ -94,6 +100,46 @@ class GraphService:
                 nodes.append(node_data)
             return nodes
     
+    async def update_observation(self, node_id: str, data: ObservationUpdate) -> bool:
+        """Update an observation node"""
+        now = datetime.utcnow()
+        updates = []
+        params = {"id": node_id}
+        
+        if data.text is not None:
+            updates.append("o.text = $text")
+            params["text"] = data.text
+        if data.confidence is not None:
+            updates.append("o.confidence = $confidence")
+            params["confidence"] = data.confidence
+        if data.concept_names is not None:
+            updates.append("o.concept_names = $concepts")
+            params["concepts"] = data.concept_names
+        
+        if not updates:
+            return False
+        
+        updates.append("o.updated_at = datetime($updated_at)")
+        params["updated_at"] = {
+            "year": now.year,
+            "month": now.month,
+            "day": now.day,
+            "hour": now.hour,
+            "minute": now.minute,
+            "second": now.second,
+        }
+        
+        query = f"""
+        MATCH (o:Observation {{id: $id}})
+        SET {', '.join(updates)}
+        RETURN o.id as id
+        """
+        
+        async with neo4j_conn.get_session() as session:
+            result = await session.run(query, **params)
+            record = await result.single()
+            return record is not None
+    
     async def create_source(self, data: SourceCreate) -> str:
         """Create a source node, return its ID"""
         node_id = str(uuid.uuid4())
@@ -141,6 +187,56 @@ class GraphService:
             record = await result.single()
             return record["id"]
     
+    async def update_source(self, node_id: str, data: SourceUpdate) -> bool:
+        """Update a source node"""
+        now = datetime.utcnow()
+        updates = []
+        params = {"id": node_id}
+        
+        if data.title is not None:
+            updates.append("s.title = $title")
+            params["title"] = data.title
+        if data.url is not None:
+            updates.append("s.url = $url")
+            params["url"] = data.url
+        if data.source_type is not None:
+            updates.append("s.source_type = $source_type")
+            params["source_type"] = data.source_type
+        if data.content is not None:
+            updates.append("s.content = $content")
+            params["content"] = data.content
+        if data.published_date is not None:
+            updates.append("s.published_date = datetime($published_date)")
+            params["published_date"] = {
+                "year": data.published_date.year,
+                "month": data.published_date.month,
+                "day": data.published_date.day,
+            }
+        
+        if not updates:
+            return False
+        
+        updates.append("s.updated_at = datetime($updated_at)")
+        params["updated_at"] = {
+            "year": now.year,
+            "month": now.month,
+            "day": now.day,
+            "hour": now.hour,
+            "minute": now.minute,
+            "second": now.second,
+        }
+        
+        query = f"""
+        MATCH (s:Source {{id: $id}})
+        SET {', '.join(updates)}
+        RETURN s.id as id
+        """
+        
+        async with neo4j_conn.get_session() as session:
+            result = await session.run(query, **params)
+            record = await result.single()
+            return record is not None
+    
     async def create_hypothesis(self, data: HypothesisCreate) -> str:
         """Create a hypothesis node, return its ID"""
         node_id = str(uuid.uuid4())
@@ -173,6 +269,155 @@ class GraphService:
             )
             record = await result.single()
             return record["id"]
+    
+    async def update_hypothesis(self, node_id: str, data: HypothesisUpdate) -> bool:
+        """Update a hypothesis node"""
+        now = datetime.utcnow()
+        updates = []
+        params = {"id": node_id}
+        
+        if data.claim is not None:
+            updates.append("h.claim = $claim")
+            params["claim"] = data.claim
+        if data.status is not None:
+            updates.append("h.status = $status")
+            params["status"] = data.status
+        
+        if not updates:
+            return False
+        
+        updates.append("h.updated_at = datetime($updated_at)")
+        params["updated_at"] = {
+            "year": now.year,
+            "month": now.month,
+            "day": now.day,
+            "hour": now.hour,
+            "minute": now.minute,
+            "second": now.second,
+        }
+        
+        query = f"""
+        MATCH (h:Hypothesis {{id: $id}})
+        SET {', '.join(updates)}
+        RETURN h.id as id
+        """
+        
+        async with neo4j_conn.get_session() as session:
+            result = await session.run(query, **params)
+            record = await result.single()
+            return record is not None
+    
+    async def create_entity(self, data: EntityCreate) -> str:
+        """Create an entity node, return its ID"""
+        node_id = str(uuid.uuid4())
+        now = datetime.utcnow()
+        
+        # Build properties dict
+        props = {
+            "id": node_id,
+            "name": data.name,
+            "entity_type": data.entity_type,
+            "created_at": {
+                "year": now.year,
+                "month": now.month,
+                "day": now.day,
+                "hour": now.hour,
+                "minute": now.minute,
+                "second": now.second,
+            }
+        }
+        
+        # Build query with optional description
+        query_parts = [
+            "id: $id",
+            "name: $name",
+            "entity_type: $entity_type",
+            "created_at: datetime($created_at)"
+        ]
+        
+        if data.description:
+            query_parts.append("description: $description")
+            props["description"] = data.description
+        
+        query = f"""
+        CREATE (e:Entity {{
+            {', '.join(query_parts)}
+        }})
+        RETURN e.id as id
+        """
+        
+        async with neo4j_conn.get_session() as session:
+            result = await session.run(query, **props)
+            record = await result.single()
+            return record["id"]
+    
+    async def update_entity(self, node_id: str, data: EntityUpdate) -> bool:
+        """Update an entity node"""
+        now = datetime.utcnow()
+        updates = []
+        params = {"id": node_id}
+        
+        if data.name is not None:
+            updates.append("e.name = $name")
+            params["name"] = data.name
+        if data.entity_type is not None:
+            updates.append("e.entity_type = $entity_type")
+            params["entity_type"] = data.entity_type
+        if data.description is not None:
+            updates.append("e.description = $description")
+            params["description"] = data.description
+        if data.properties is not None:
+            # Merge with existing properties
+            updates.append("e.properties = COALESCE(e.properties, {{}}) + $properties")
+            params["properties"] = data.properties
+        
+        if not updates:
+            return False
+        
+        updates.append("e.updated_at = datetime($updated_at)")
+        params["updated_at"] = {
+            "year": now.year,
+            "month": now.month,
+            "day": now.day,
+            "hour": now.hour,
+            "minute": now.minute,
+            "second": now.second,
+        }
+        
+        query = f"""
+        MATCH (e:Entity {{id: $id}})
+        SET {', '.join(updates)}
+        RETURN e.id as id
+        """
+        
+        async with neo4j_conn.get_session() as session:
+            result = await session.run(query, **params)
+            record = await result.single()
+            return record is not None
+    
+    async def get_node(self, node_id: str) -> Optional[Dict[str, Any]]:
+        """Get any node by ID, regardless of type"""
+        query = """
+        MATCH (n {id: $id})
+        RETURN labels(n) as labels, n
+        LIMIT 1
+        """
+        
+        async with neo4j_conn.get_session() as session:
+            result = await session.run(query, id=node_id)
+            record = await result.single()
+            if record:
+                labels = record["labels"]
+                node_data = dict(record["n"])
+                # Convert datetime objects to ISO strings
+                for key, value in node_data.items():
+                    if isinstance(value, datetime):
+                        node_data[key] = value.isoformat()
+                # Set type from first label
+                if labels:
+                    node_data["type"] = labels[0]
+                return node_data
+            return None
     
     async def create_relationship(
         self,

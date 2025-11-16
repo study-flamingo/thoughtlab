@@ -19,14 +19,14 @@ class RedisConnection:
             )
             # Verify connection
             await self.client.ping()
-            print("✓ Connected to Redis")
+            print("Connected to Redis")
     
     async def disconnect(self):
         """Close Redis connection"""
         if self.client:
             await self.client.close()
             self.client = None
-            print("✓ Disconnected from Redis")
+            print("Disconnected from Redis")
     
     def get_client(self):
         """Get Redis client"""

@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import GraphVisualizer from './components/GraphVisualizer';
 import ActivityFeed from './components/ActivityFeed';
+import NodeInspector from './components/NodeInspector';
 import CreateNodeModal from './components/CreateNodeModal';
 
 function App() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
 
   return (
     <div className="h-screen flex flex-col bg-gray-100">
@@ -26,12 +28,16 @@ function App() {
       <div className="flex-1 flex overflow-hidden">
         {/* Graph Visualizer (main area) */}
         <main className="flex-1 p-4">
-          <GraphVisualizer />
+          <GraphVisualizer onNodeSelect={setSelectedNodeId} selectedNodeId={selectedNodeId} />
         </main>
 
-        {/* Activity Feed (sidebar) */}
-        <aside className="w-80 bg-white border-l shadow-sm overflow-y-auto">
-          <ActivityFeed />
+        {/* Sidebar - Show NodeInspector if node selected, otherwise ActivityFeed */}
+        <aside className="w-80 bg-white border-l shadow-sm overflow-hidden flex flex-col">
+          {selectedNodeId ? (
+            <NodeInspector nodeId={selectedNodeId} onClose={() => setSelectedNodeId(null)} />
+          ) : (
+            <ActivityFeed />
+          )}
         </aside>
       </div>
 

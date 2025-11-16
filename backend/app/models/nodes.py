@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field
 from datetime import datetime
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from enum import Enum
 
 
@@ -36,6 +36,12 @@ class ObservationCreate(BaseModel):
     concept_names: Optional[List[str]] = None
 
 
+class ObservationUpdate(BaseModel):
+    text: Optional[str] = Field(None, min_length=1, max_length=10000)
+    confidence: Optional[float] = Field(None, ge=0.0, le=1.0)
+    concept_names: Optional[List[str]] = None
+
+
 class ObservationResponse(NodeBase):
     text: str
     confidence: float
@@ -47,6 +53,14 @@ class SourceCreate(BaseModel):
     title: str = Field(..., min_length=1, max_length=500)
     url: Optional[str] = None
     source_type: str = Field(default="paper")  # paper, forum, article, etc.
+    content: Optional[str] = None
+    published_date: Optional[datetime] = None
+
+
+class SourceUpdate(BaseModel):
+    title: Optional[str] = Field(None, min_length=1, max_length=500)
+    url: Optional[str] = None
+    source_type: Optional[str] = None
     content: Optional[str] = None
     published_date: Optional[datetime] = None
 
@@ -66,10 +80,37 @@ class HypothesisCreate(BaseModel):
     status: str = Field(default="proposed")  # proposed, tested, confirmed, rejected
 
 
+class HypothesisUpdate(BaseModel):
+    claim: Optional[str] = Field(None, min_length=1, max_length=10000)
+    status: Optional[str] = None
+
+
 class HypothesisResponse(NodeBase):
     claim: str
     status: str
     type: str = "Hypothesis"
+
+
+class EntityCreate(BaseModel):
+    name: str = Field(..., min_length=1, max_length=500)
+    entity_type: str = Field(default="generic")  # person, organization, location, concept, etc.
+    description: Optional[str] = None
+    properties: Optional[Dict[str, Any]] = None
+
+
+class EntityUpdate(BaseModel):
+    name: Optional[str] = Field(None, min_length=1, max_length=500)
+    entity_type: Optional[str] = None
+    description: Optional[str] = None
+    properties: Optional[Dict[str, Any]] = None
+
+
+class EntityResponse(NodeBase):
+    name: str
+    entity_type: str
+    description: Optional[str] = None
+    properties: Optional[Dict[str, Any]] = None
+    type: str = "Entity"
 
 
 class RelationshipCreate(BaseModel):

@@ -40,6 +40,20 @@ export const graphApi = {
   createObservation: (data: CreateObservationData) =>
     api.post<{ id: string; message: string }>('/nodes/observations', data),
 
+  createEntity: (data: { name: string; entity_type?: string; description?: string }) =>
+    api.post<{ id: string; message: string }>('/nodes/entities', data),
+
+  getNode: (id: string) => api.get<GraphNode>(`/nodes/${id}`),
+
+  updateObservation: (id: string, data: { text?: string; confidence?: number; concept_names?: string[] }) =>
+    api.put<{ id: string; message: string }>(`/nodes/observations/${id}`, data),
+
+  updateEntity: (id: string, data: { name?: string; entity_type?: string; description?: string }) =>
+    api.put<{ id: string; message: string }>(`/nodes/entities/${id}`, data),
+
+  updateHypothesis: (id: string, data: { claim?: string; status?: string }) =>
+    api.put<{ id: string; message: string }>(`/nodes/hypotheses/${id}`, data),
+
   getObservation: (id: string) => api.get<GraphNode>(`/nodes/observations/${id}`),
 
   getAllObservations: (limit?: number) =>

@@ -12,6 +12,8 @@ export interface GraphNode {
   type: NodeType;
   text?: string;
   title?: string;
+  name?: string; // For Entity nodes
+  description?: string; // For Entity nodes
   confidence?: number;
   concept_names?: string[];
   created_at: string;

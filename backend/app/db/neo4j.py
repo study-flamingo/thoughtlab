@@ -19,14 +19,14 @@ class Neo4jConnection:
             # Verify connection
             async with self.driver.session() as session:
                 await session.run("RETURN 1")
-            print("✓ Connected to Neo4j")
+            print("Connected to Neo4j")
     
     async def disconnect(self):
         """Close Neo4j connection"""
         if self.driver:
             await self.driver.close()
             self.driver = None
-            print("✓ Disconnected from Neo4j")
+            print("Disconnected from Neo4j")
     
     def get_session(self):
         """Get a Neo4j session"""
