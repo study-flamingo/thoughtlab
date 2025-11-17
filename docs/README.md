@@ -457,10 +457,10 @@ docker-compose up -d
 
 ## Documentation
 
-- [Project Overview](./docs/01-PROJECT_OVERVIEW.md)
-- [Architecture Decisions](./docs/02-ARCHITECTURE_DECISIONS.md)
-- [Development Roadmap](./docs/03-DEVELOPMENT_ROADMAP.md)
-- [Technical Setup Guide](./docs/04-TECHNICAL_SETUP_GUIDE.md)
+- [Project Overview](./01-PROJECT_OVERVIEW.md)
+- [Architecture Decisions](./02-ARCHITECTURE_DECISIONS.md)
+- [Development Roadmap](./03-DEVELOPMENT_ROADMAP.md)
+- [Technical Setup Guide](./04-TECHNICAL_SETUP_GUIDE.md)
 - [Testing Guide](./TESTING.md)
 - [Backend Setup](./BACKEND_SETUP.md)
 - [Frontend Setup](./FRONTEND_SETUP.md)
@@ -479,3 +479,5 @@ For issues and questions, please check:
 1. This README
 2. Documentation in `docs/` directory
 3. API documentation at http://localhost:8000/docs
+
+

@@ -27,6 +27,10 @@ export interface GraphEdge {
   type: RelationshipType;
   confidence?: number;
   notes?: string;
+  // Inverse relationship metadata for asymmetrical relationships
+  inverse_relationship_type?: RelationshipType;
+  inverse_confidence?: number;
+  inverse_notes?: string;
 }
 
 export interface GraphData {

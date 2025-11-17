@@ -64,12 +64,27 @@ export const graphApi = {
   getConnections: (id: string, maxDepth = 2) =>
     api.get(`/nodes/${id}/connections`, { params: { max_depth: maxDepth } }),
 
-  createRelationship: (fromId: string, toId: string, type: string, confidence?: number) =>
+  createRelationship: (
+    fromId: string,
+    toId: string,
+    type: string,
+    options?: {
+      confidence?: number;
+      notes?: string;
+      inverse_relationship_type?: string;
+      inverse_confidence?: number;
+      inverse_notes?: string;
+    }
+  ) =>
     api.post('/nodes/relationships', {
       from_id: fromId,
       to_id: toId,
       relationship_type: type,
-      confidence,
+      confidence: options?.confidence,
+      notes: options?.notes,
+      inverse_relationship_type: options?.inverse_relationship_type,
+      inverse_confidence: options?.inverse_confidence,
+      inverse_notes: options?.inverse_notes,
     }),
 
   approveSuggestion: (suggestionId: string) =>

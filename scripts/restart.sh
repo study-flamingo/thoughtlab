@@ -16,5 +16,5 @@ echo ""
 echo "Waiting 2 seconds before starting..."
 sleep 2
 
-# Start servers
-"$SCRIPT_DIR/start.sh"
+# Start servers (pass through any flags, e.g., --detached)
+"$SCRIPT_DIR/start.sh" "$@"

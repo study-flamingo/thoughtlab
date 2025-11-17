@@ -1,4 +1,4 @@
-from neo4j import AsyncGraphDatabase
+from neo4j import AsyncGraphDatabase, AsyncDriver
 from app.core.config import settings
 from typing import Optional
 
@@ -7,7 +7,7 @@ class Neo4jConnection:
     """Neo4j database connection manager"""
     
     def __init__(self):
-        self.driver: Optional[AsyncGraphDatabase.driver] = None
+        self.driver: Optional[AsyncDriver] = None
     
     async def connect(self):
         """Connect to Neo4j database"""
@@ -17,8 +17,7 @@ class Neo4jConnection:
                 auth=(settings.neo4j_user, settings.neo4j_password)
             )
             # Verify connection
-            async with self.driver.session() as session:
-                await session.run("RETURN 1")
+            await self.driver.verify_connectivity()
             print("Connected to Neo4j")
     
     async def disconnect(self):

@@ -24,7 +24,8 @@ class RedisConnection:
     async def disconnect(self):
         """Close Redis connection"""
         if self.client:
-            await self.client.close()
+            # Use aclose for asyncio Redis client
+            await self.client.aclose()
             self.client = None
             print("Disconnected from Redis")
     

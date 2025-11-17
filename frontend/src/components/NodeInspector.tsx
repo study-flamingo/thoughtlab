@@ -15,7 +15,7 @@ export default function NodeInspector({ nodeId, onClose }: Props) {
 
   const { data: node, isLoading } = useQuery({
     queryKey: ['node', nodeId],
-    queryFn: () => graphApi.getNode(nodeId!),
+    queryFn: async () => (await graphApi.getNode(nodeId!)).data,
     enabled: !!nodeId,
   });
 

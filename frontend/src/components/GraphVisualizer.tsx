@@ -183,24 +183,37 @@ export default function GraphVisualizer({ onNodeSelect, selectedNodeId: external
 
     const handleTap = (event: cytoscape.EventObject) => {
       try {
-        const target = event.target;
+        const target = event.target as any;
         console.log('Tap event fired, target:', target); // Debug log
-        if (target.isNode()) {
-          const nodeId = target.id();
-          console.log('Node tapped:', nodeId); // Debug log
-          setSelectedNodeId(nodeId);
-          // Highlight selected node and its neighbors
-          if (!cy.destroyed()) {
-            cy.elements().removeClass('highlighted');
-            target.addClass('highlighted');
-            target.neighborhood().addClass('highlighted');
-          }
-        } else {
+
+        // Background/core taps: deselect
+        if (target === cy || typeof target?.isNode !== 'function') {
           console.log('Background tapped, deselecting'); // Debug log
           setSelectedNodeId(null);
           if (!cy.destroyed()) {
             cy.elements().removeClass('highlighted');
           }
+          return;
+        }
+
+        // Node taps: select and highlight
+        if (target.isNode()) {
+          const nodeId = target.id();
+          console.log('Node tapped:', nodeId); // Debug log
+          setSelectedNodeId(nodeId);
+          if (!cy.destroyed()) {
+            cy.elements().removeClass('highlighted');
+            target.addClass('highlighted');
+            target.neighborhood().addClass('highlighted');
+          }
+          return;
+        }
+
+        // Edge or other element taps: treat as background for now
+        console.log('Non-node element tapped, deselecting'); // Debug log
+        setSelectedNodeId(null);
+        if (!cy.destroyed()) {
+          cy.elements().removeClass('highlighted');
         }
       } catch (error) {
         console.warn('Error handling tap event:', error);

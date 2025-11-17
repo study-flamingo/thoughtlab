@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from app.models.nodes import (
     ObservationCreate,
     ObservationUpdate,
@@ -17,6 +17,8 @@ from app.models.nodes import (
 )
 from app.services.graph_service import graph_service
 from typing import List
+from fastapi.encoders import jsonable_encoder
+from fastapi.responses import JSONResponse
 
 router = APIRouter(prefix="/nodes", tags=["nodes"])
 
@@ -38,7 +40,7 @@ async def get_observation(node_id: str):
 
 
 @router.get("/observations", response_model=dict)
-async def get_all_observations(limit: int = 100):
+async def get_all_observations(limit: int = Query(100, ge=1, le=1000)):
     """Get all observation nodes"""
     observations = await graph_service.get_all_observations(limit=limit)
     return {"nodes": observations}
@@ -102,6 +104,10 @@ async def create_relationship(data: RelationshipCreate):
         {
             "confidence": data.confidence,
             "notes": data.notes,
+            # Inverse metadata stored on the relationship for reference
+            "inverse_relationship_type": data.inverse_relationship_type.value if data.inverse_relationship_type else None,
+            "inverse_confidence": data.inverse_confidence,
+            "inverse_notes": data.inverse_notes,
         }
     )
     if not success:
@@ -113,7 +119,7 @@ async def create_relationship(data: RelationshipCreate):
 
 
 @router.get("/{node_id}/connections", response_model=dict)
-async def get_connections(node_id: str, max_depth: int = 2):
+async def get_connections(node_id: str, max_depth: int = Query(2, ge=1, le=5)):
     """Get all connections for a node"""
     connections = await graph_service.get_node_connections(node_id, max_depth)
     return {"node_id": node_id, "connections": connections}
@@ -122,7 +128,15 @@ async def get_connections(node_id: str, max_depth: int = 2):
 @router.get("/{node_id}", response_model=dict)
 async def get_node(node_id: str):
     """Get any node by ID"""
-    node = await graph_service.get_node(node_id)
-    if not node:
-        raise HTTPException(status_code=404, detail="Node not found")
-    return node
+    try:
+        node = await graph_service.get_node(node_id)
+        if not node:
+            raise HTTPException(status_code=404, detail="Node not found")
+        # Use jsonable_encoder to safely handle special types
+        return JSONResponse(content=jsonable_encoder(node))
+    except HTTPException:
+        # Re-raise explicit HTTP errors
+        raise
+    except Exception as e:
+        # Surface unexpected errors with a clear message
+        raise HTTPException(status_code=500, detail=f"Failed to fetch node: {str(e)}")

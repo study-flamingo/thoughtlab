@@ -6,6 +6,20 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+RUN_DIR="$PROJECT_ROOT/.run"
+DETACHED=0
+
+# Parse flags
+for arg in "$@"; do
+    case "$arg" in
+        -d|--detached)
+            DETACHED=1
+            shift
+            ;;
+    esac
+done
+
+mkdir -p "$RUN_DIR"
 
 echo "🚀 Starting Research Connection Graph..."
 echo ""
@@ -60,10 +74,15 @@ elif command -v ss > /dev/null 2>&1 && ss -tuln 2>/dev/null | grep -q ":8000"; t
     echo "⚠️  Port 8000 is already in use. Backend may already be running."
 fi
 
-# Start backend in background
+# Start backend (background; optionally detached)
 echo "Backend starting at http://localhost:8000"
-"$VENV_PYTHON" -m uvicorn app.main:app --reload > /tmp/research-graph-backend.log 2>&1 &
+if [ $DETACHED -eq 1 ]; then
+    nohup "$VENV_PYTHON" -m uvicorn app.main:app --reload > /tmp/research-graph-backend.log 2>&1 &
+else
+    "$VENV_PYTHON" -m uvicorn app.main:app --reload > /tmp/research-graph-backend.log 2>&1 &
+fi
 BACKEND_PID=$!
+echo $BACKEND_PID > "$RUN_DIR/backend.pid"
 
 # Give backend a moment to start
 sleep 2
@@ -94,10 +113,15 @@ elif command -v ss > /dev/null 2>&1 && ss -tuln 2>/dev/null | grep -q ":5173"; t
     echo "⚠️  Port 5173 is already in use. Frontend will try the next available port."
 fi
 
-# Start frontend in background
+# Start frontend (background; optionally detached)
 echo "Frontend starting at http://localhost:5173"
-npm run dev > /tmp/research-graph-frontend.log 2>&1 &
+if [ $DETACHED -eq 1 ]; then
+    nohup npm run dev > /tmp/research-graph-frontend.log 2>&1 &
+else
+    npm run dev > /tmp/research-graph-frontend.log 2>&1 &
+fi
 FRONTEND_PID=$!
+echo $FRONTEND_PID > "$RUN_DIR/frontend.pid"
 
 # Give frontend a moment to start
 sleep 2
@@ -119,7 +143,13 @@ echo "Logs:"
 echo "  Backend:  tail -f /tmp/research-graph-backend.log"
 echo "  Frontend: tail -f /tmp/research-graph-frontend.log"
 echo ""
-echo "Press Ctrl+C to stop all servers"
+
+if [ $DETACHED -eq 1 ]; then
+    echo "Running in detached mode. PID files:"
+    echo "  $RUN_DIR/backend.pid"
+    echo "  $RUN_DIR/frontend.pid"
+    exit 0
+fi
 
 # Function to cleanup on exit
 cleanup() {

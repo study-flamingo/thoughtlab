@@ -3,9 +3,11 @@ import GraphVisualizer from './components/GraphVisualizer';
 import ActivityFeed from './components/ActivityFeed';
 import NodeInspector from './components/NodeInspector';
 import CreateNodeModal from './components/CreateNodeModal';
+import CreateRelationModal from './components/CreateRelationModal';
 
 function App() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isCreateRelationOpen, setIsCreateRelationOpen] = useState(false);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
 
   return (
@@ -15,13 +17,21 @@ function App() {
         <h1 className="text-xl font-semibold text-gray-800">
           Research Connection Graph
         </h1>
-        <button
-          onClick={() => setIsCreateModalOpen(true)}
-          className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 flex items-center gap-2 transition-colors"
-        >
-          <span className="text-lg">+</span>
-          Add Node
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setIsCreateRelationOpen(true)}
+            className="bg-white text-gray-800 px-4 py-2 rounded-md border hover:bg-gray-50 transition-colors"
+          >
+            Add Relation
+          </button>
+          <button
+            onClick={() => setIsCreateModalOpen(true)}
+            className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 flex items-center gap-2 transition-colors"
+          >
+            <span className="text-lg">+</span>
+            Add Node
+          </button>
+        </div>
       </header>
 
       {/* Main Content */}
@@ -44,6 +54,11 @@ function App() {
       {/* Create Node Modal */}
       {isCreateModalOpen && (
         <CreateNodeModal onClose={() => setIsCreateModalOpen(false)} />
+      )}
+
+      {/* Create Relation Modal */}
+      {isCreateRelationOpen && (
+        <CreateRelationModal onClose={() => setIsCreateRelationOpen(false)} />
       )}
     </div>
   );

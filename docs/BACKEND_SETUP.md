@@ -136,3 +136,5 @@ backend/
 - Neo4j takes ~30 seconds to fully start
 
 **Port conflicts**: Change ports in docker-compose.yml if needed
+
+

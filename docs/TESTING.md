@@ -156,3 +156,5 @@ jobs:
 **React Query errors:**
 - Use `renderWithProviders` from test utils
 - Ensure QueryClientProvider wraps components
+
+

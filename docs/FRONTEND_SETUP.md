@@ -157,3 +157,5 @@ frontend/
 - [ ] Add filtering and search
 - [ ] Add node editing functionality
 - [ ] Implement relationship visualization
+
+

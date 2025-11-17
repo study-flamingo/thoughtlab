@@ -1,4 +1,5 @@
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
+from typing import List
 from functools import lru_cache
 
 
@@ -16,14 +17,18 @@ class Settings(BaseSettings):
     # Application
     debug: bool = False
     environment: str = "development"
+    cors_allow_origins: List[str] = [
+        "http://localhost:5173",
+        "http://localhost:3000",
+    ]
     
     # LLM
     openai_api_key: str = ""
     anthropic_api_key: str = ""
-    
-    class Config:
-        env_file = ".env"
-        case_sensitive = False
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        case_sensitive=False,
+    )
 
 
 @lru_cache

@@ -45,7 +45,7 @@ class ObservationUpdate(BaseModel):
 class ObservationResponse(NodeBase):
     text: str
     confidence: float
-    concept_names: List[str] = []
+    concept_names: List[str] = Field(default_factory=list)
     type: str = "Observation"
 
 
@@ -119,6 +119,10 @@ class RelationshipCreate(BaseModel):
     relationship_type: RelationshipType
     confidence: Optional[float] = Field(None, ge=0.0, le=1.0)
     notes: Optional[str] = None
+    # Inverse relationship metadata for asymmetrical relationships when reversed
+    inverse_relationship_type: Optional[RelationshipType] = None
+    inverse_confidence: Optional[float] = Field(None, ge=0.0, le=1.0)
+    inverse_notes: Optional[str] = None
 
 
 class RelationshipResponse(BaseModel):
