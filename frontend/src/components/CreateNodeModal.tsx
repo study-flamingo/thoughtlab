@@ -33,6 +33,15 @@ export default function CreateNodeModal({ onClose }: Props) {
     },
   });
 
+  const createSourceMutation = useMutation({
+    mutationFn: (payload: { title: string; url?: string }) =>
+      graphApi.createSource({ title: payload.title, url: payload.url }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['graph'] });
+      onClose();
+    },
+  });
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (nodeType === 'observation') {
@@ -41,6 +50,11 @@ export default function CreateNodeModal({ onClose }: Props) {
       createEntityMutation.mutate({ 
         name: entityName, 
         description: entityDescription || undefined 
+      });
+    } else if (nodeType === 'source') {
+      createSourceMutation.mutate({
+        title,
+        url: url || undefined,
       });
     }
     // TODO: Handle other node types (hypothesis, source, concept)
@@ -184,10 +198,10 @@ export default function CreateNodeModal({ onClose }: Props) {
             </button>
             <button
               type="submit"
-              disabled={createObservationMutation.isPending || createEntityMutation.isPending}
+              disabled={createObservationMutation.isPending || createEntityMutation.isPending || createSourceMutation.isPending}
               className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              {(createObservationMutation.isPending || createEntityMutation.isPending) ? 'Creating...' : 'Create Node'}
+              {(createObservationMutation.isPending || createEntityMutation.isPending || createSourceMutation.isPending) ? 'Creating...' : 'Create Node'}
             </button>
           </div>
         </form>

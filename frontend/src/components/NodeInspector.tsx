@@ -65,6 +65,14 @@ export default function NodeInspector({ nodeId, onClose }: Props) {
     },
   });
 
+  const deleteNodeMutation = useMutation({
+    mutationFn: (id: string) => graphApi.deleteNode(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['graph'] });
+      onClose();
+    },
+  });
+
   const handleSave = () => {
     if (!node) return;
 
@@ -353,12 +361,27 @@ export default function NodeInspector({ nodeId, onClose }: Props) {
             </button>
           </>
         ) : (
-          <button
-            onClick={() => setIsEditing(true)}
-            className="w-full px-4 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-          >
-            Edit
-          </button>
+          <>
+            <button
+              onClick={() => setIsEditing(true)}
+              className="flex-1 px-4 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+            >
+              Edit
+            </button>
+            <button
+              onClick={() => {
+                if (confirm('Delete this node and all connected relationships? This cannot be undone.')) {
+                  if (nodeId) {
+                    deleteNodeMutation.mutate(nodeId);
+                  }
+                }
+              }}
+              className="flex-1 px-4 py-2 text-sm bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors disabled:opacity-50"
+              disabled={deleteNodeMutation.isPending}
+            >
+              {deleteNodeMutation.isPending ? 'Deleting...' : 'Delete'}
+            </button>
+          </>
         )}
       </div>
     </div>

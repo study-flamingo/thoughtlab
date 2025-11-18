@@ -15,6 +15,7 @@ from app.models.nodes import (
     RelationshipCreate,
     RelationshipType,
 )
+from app.models.settings import AppSettings, AppSettingsUpdate
 from datetime import datetime, UTC
 from neo4j.time import DateTime as Neo4jDateTime, Date as Neo4jDate, Time as Neo4jTime
 import uuid
@@ -444,6 +445,19 @@ class GraphService:
                     node_data["type"] = labels[0]
                 return node_data
             return None
+
+    async def delete_node(self, node_id: str) -> bool:
+        """Delete a node and all its relationships by application id"""
+        await self._ensure_neo4j()
+        query = """
+        MATCH (n {id: $id})
+        WITH n LIMIT 1
+        DETACH DELETE n
+        RETURN 1 as deleted
+        """
+        async with neo4j_conn.get_session() as session:
+            result = await session.run(query, id=node_id)
+            return await result.single() is not None
     
     async def create_relationship(
         self,
@@ -454,10 +468,13 @@ class GraphService:
     ) -> bool:
         """Create a relationship between two nodes"""
         await self._ensure_neo4j()
+        # Ensure each relationship has a stable UUID identifier
+        rel_id = str(uuid.uuid4())
         query = f"""
         MATCH (a {{id: $from_id}})
         MATCH (b {{id: $to_id}})
         CREATE (a)-[r:{rel_type.value} $props]->(b)
+        SET r.id = $rel_id
         RETURN r
         """
         
@@ -468,9 +485,107 @@ class GraphService:
                 query,
                 from_id=from_id,
                 to_id=to_id,
-                props=props
+                props=props,
+                rel_id=rel_id,
             )
             return await result.single() is not None
+    
+    async def get_relationship(self, relationship_id: str) -> Optional[Dict[str, Any]]:
+        """Get a relationship by its UUID ID property"""
+        await self._ensure_neo4j()
+        query = """
+        MATCH (a)-[r]->(b)
+        WHERE r.id = $rel_id
+        RETURN a.id as from_id, b.id as to_id, type(r) as type, 
+               r.id as id, properties(r) as props
+        LIMIT 1
+        """
+        
+        async with neo4j_conn.get_session() as session:
+            result = await session.run(query, rel_id=relationship_id)
+            record = await result.single()
+            if record:
+                rel_data = {
+                    "id": record["id"],
+                    "from_id": record["from_id"],
+                    "to_id": record["to_id"],
+                    "type": record["type"],
+                }
+                props = dict(record.get("props", {}))
+                for key in [
+                    "confidence",
+                    "notes",
+                    "inverse_relationship_type",
+                    "inverse_confidence",
+                    "inverse_notes",
+                    "created_at",
+                ]:
+                    if key in props:
+                        rel_data[key] = GraphService._json_safe(props[key])
+                return rel_data
+            return None
+
+    async def delete_relationship(self, relationship_id: str) -> bool:
+        """Delete a relationship by its UUID id property"""
+        await self._ensure_neo4j()
+        query = """
+        MATCH ()-[r]->()
+        WHERE r.id = $rel_id
+        WITH r LIMIT 1
+        DELETE r
+        RETURN 1 as deleted
+        """
+        async with neo4j_conn.get_session() as session:
+            result = await session.run(query, rel_id=relationship_id)
+            return await result.single() is not None
+    
+    async def update_relationship(
+        self,
+        relationship_id: str,
+        properties: Dict[str, Any]
+    ) -> bool:
+        """Update properties of a relationship"""
+        await self._ensure_neo4j()
+        # Build SET clause dynamically based on provided properties
+        set_clauses = []
+        params = {"rel_id": relationship_id}
+        # Extract potential relationship type change
+        new_type = properties.pop("relationship_type", None)
+        
+        for key, value in properties.items():
+            if value is not None:
+                param_name = f"prop_{key}"
+                set_clauses.append(f"{'nr' if new_type else 'r'}.{key} = ${param_name}")
+                params[param_name] = value
+
+        async with neo4j_conn.get_session() as session:
+            if new_type:
+                # Change relationship type by recreating the relationship and reapplying properties
+                set_clause_sql = f"SET {', '.join(set_clauses)}" if set_clauses else ""
+                query = f"""
+                MATCH (a)-[r]->(b)
+                WHERE r.id = $rel_id
+                WITH a,b,r,properties(r) AS props
+                CREATE (a)-[nr:{new_type}]->(b)
+                SET nr = props
+                SET nr.id = r.id
+                DELETE r
+                {set_clause_sql}
+                RETURN nr
+                """
+                result = await session.run(query, **params)
+                return await result.single() is not None
+            else:
+                if not set_clauses:
+                    return False
+                query = f"""
+                MATCH ()-[r]->()
+                WHERE r.id = $rel_id
+                SET {', '.join(set_clauses)}
+                RETURN r
+                """
+                result = await session.run(query, **params)
+                return await result.single() is not None
     
     async def get_node_connections(
         self,
@@ -525,7 +640,7 @@ class GraphService:
         MATCH (a)-[r]->(b)
         WHERE (a:Observation OR a:Hypothesis OR a:Source OR a:Entity OR a:Concept)
           AND (b:Observation OR b:Hypothesis OR b:Source OR b:Entity OR b:Concept)
-        RETURN a.id as source, b.id as target, type(r) as type, id(r) as edge_id, properties(r) as props
+        RETURN a.id as source, b.id as target, type(r) as type, r.id as edge_id, properties(r) as props
         LIMIT $edges_limit
         """
         
@@ -564,6 +679,79 @@ class GraphService:
                 edges.append(edge)
         
         return {"nodes": nodes, "edges": edges}
+
+    async def get_settings(self) -> Dict[str, Any]:
+        """Fetch or initialize singleton app settings."""
+        await self._ensure_neo4j()
+        query = """
+        MERGE (s:AppSettings {id: 'app'})
+        ON CREATE SET
+          s.theme = 'light',
+          s.show_edge_labels = true,
+          s.default_relation_confidence = 0.8,
+          s.layout_name = 'cose',
+          s.animate_layout = false
+        RETURN s
+        """
+        async with neo4j_conn.get_session() as session:
+            result = await session.run(query)
+            record = await result.single()
+            node = dict(record["s"])
+            # Normalize into AppSettings
+            settings = AppSettings(
+                id=node.get("id", "app"),
+                theme=node.get("theme", "light"),
+                show_edge_labels=bool(node.get("show_edge_labels", True)),
+                default_relation_confidence=float(node.get("default_relation_confidence", 0.8)),
+                layout_name=node.get("layout_name", "cose"),
+                animate_layout=bool(node.get("animate_layout", False)),
+            )
+            return settings.model_dump()
+
+    async def update_settings(self, update: AppSettingsUpdate) -> Dict[str, Any]:
+        """Update settings fields atomically, returning updated settings."""
+        await self._ensure_neo4j()
+        updates: Dict[str, Any] = {}
+        if update.theme is not None:
+            updates["theme"] = update.theme
+        if update.show_edge_labels is not None:
+            updates["show_edge_labels"] = update.show_edge_labels
+        if update.default_relation_confidence is not None:
+            updates["default_relation_confidence"] = update.default_relation_confidence
+        if update.layout_name is not None:
+            updates["layout_name"] = update.layout_name
+        if update.animate_layout is not None:
+            updates["animate_layout"] = update.animate_layout
+
+        if not updates:
+            # No-op; just return current settings
+            return await self.get_settings()
+
+        set_clauses = []
+        params: Dict[str, Any] = {}
+        for key, value in updates.items():
+            param_name = f"p_{key}"
+            set_clauses.append(f"s.{key} = ${param_name}")
+            params[param_name] = value
+
+        query = f"""
+        MERGE (s:AppSettings {{id: 'app'}})
+        SET {', '.join(set_clauses)}
+        RETURN s
+        """
+        async with neo4j_conn.get_session() as session:
+            result = await session.run(query, **params)
+            record = await result.single()
+            node = dict(record["s"])
+            settings = AppSettings(
+                id=node.get("id", "app"),
+                theme=node.get("theme", "light"),
+                show_edge_labels=bool(node.get("show_edge_labels", True)),
+                default_relation_confidence=float(node.get("default_relation_confidence", 0.8)),
+                layout_name=node.get("layout_name", "cose"),
+                animate_layout=bool(node.get("animate_layout", False)),
+            )
+            return settings.model_dump()
 
 
 # Global service instance

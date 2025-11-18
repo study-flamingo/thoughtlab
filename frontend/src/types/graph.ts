@@ -33,6 +33,19 @@ export interface GraphEdge {
   inverse_notes?: string;
 }
 
+export interface RelationshipResponse {
+  id: string;
+  from_id: string;
+  to_id: string;
+  type: RelationshipType;
+  confidence?: number;
+  notes?: string;
+  inverse_relationship_type?: RelationshipType;
+  inverse_confidence?: number;
+  inverse_notes?: string;
+  created_at?: string;
+}
+
 export interface GraphData {
   nodes: GraphNode[];
   edges: GraphEdge[];

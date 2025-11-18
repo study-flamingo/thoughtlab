@@ -80,7 +80,7 @@ This will:
 ### 1. Start Database Services
 
 ```bash
-# Start Neo4j, PostgreSQL, and Redis
+# Start Neo4j and Redis
 docker-compose up -d
 
 # Verify services are running
@@ -321,7 +321,7 @@ npm run test:ui
 npm run test:coverage
 ```
 
-See [TESTING.md](./TESTING.md) for detailed testing information.
+See [TESTING.md](./docs/TESTING.md) for detailed testing information.
 
 ## Configuration
 
@@ -335,6 +335,7 @@ NEO4J_URI=bolt://localhost:7687
 NEO4J_USER=neo4j
 NEO4J_PASSWORD=research_graph_password
 
+# Optional: PostgreSQL (scaffolded; not required by default)
 DATABASE_URL=postgresql+asyncpg://research_user:research_db_password@localhost/research_graph
 REDIS_URL=redis://localhost:6379
 
@@ -398,7 +399,6 @@ npm install
 ```bash
 # Check logs
 docker-compose logs neo4j
-docker-compose logs postgres
 docker-compose logs redis
 
 # Reset if needed (WARNING: deletes data)
@@ -457,13 +457,14 @@ docker-compose up -d
 
 ## Documentation
 
-- [Project Overview](./01-PROJECT_OVERVIEW.md)
-- [Architecture Decisions](./02-ARCHITECTURE_DECISIONS.md)
-- [Development Roadmap](./03-DEVELOPMENT_ROADMAP.md)
-- [Technical Setup Guide](./04-TECHNICAL_SETUP_GUIDE.md)
-- [Testing Guide](./TESTING.md)
-- [Backend Setup](./BACKEND_SETUP.md)
-- [Frontend Setup](./FRONTEND_SETUP.md)
+- [Project Overview](./docs/01-PROJECT_OVERVIEW.md)
+- [Architecture Decisions](./docs/02-ARCHITECTURE_DECISIONS.md)
+- [Development Roadmap](./docs/03-DEVELOPMENT_ROADMAP.md)
+- [Technical Setup Guide](./docs/04-TECHNICAL_SETUP_GUIDE.md)
+- [Testing Guide](./docs/TESTING.md)
+- [Backend Setup](./docs/BACKEND_SETUP.md)
+- [Frontend Setup](./docs/FRONTEND_SETUP.md)
+- [Python uv Setup](./docs/UV_SETUP.md)
 
 ## License
 

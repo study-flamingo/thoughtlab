@@ -13,6 +13,7 @@ from app.models.nodes import (
     EntityUpdate,
     EntityResponse,
     RelationshipCreate,
+    RelationshipUpdate,
     RelationshipResponse,
 )
 from app.services.graph_service import graph_service
@@ -118,6 +119,49 @@ async def create_relationship(data: RelationshipCreate):
     return {"message": "Relationship created"}
 
 
+@router.get("/relationships/{relationship_id}", response_model=dict)
+async def get_relationship(relationship_id: str):
+    """Get a relationship by ID"""
+    relationship = await graph_service.get_relationship(relationship_id)
+    if not relationship:
+        raise HTTPException(status_code=404, detail="Relationship not found")
+    return JSONResponse(content=jsonable_encoder(relationship))
+
+
+@router.put("/relationships/{relationship_id}", response_model=dict)
+async def update_relationship(relationship_id: str, data: RelationshipUpdate):
+    """Update a relationship"""
+    update_props = {}
+    if data.confidence is not None:
+        update_props["confidence"] = data.confidence
+    if data.notes is not None:
+        update_props["notes"] = data.notes
+    if data.relationship_type is not None:
+        update_props["relationship_type"] = data.relationship_type.value
+    if data.inverse_relationship_type is not None:
+        update_props["inverse_relationship_type"] = data.inverse_relationship_type.value
+    if data.inverse_confidence is not None:
+        update_props["inverse_confidence"] = data.inverse_confidence
+    if data.inverse_notes is not None:
+        update_props["inverse_notes"] = data.inverse_notes
+    
+    success = await graph_service.update_relationship(relationship_id, update_props)
+    if not success:
+        raise HTTPException(
+            status_code=404,
+            detail="Relationship not found or no changes provided"
+        )
+    return {"id": relationship_id, "message": "Relationship updated"}
+
+@router.delete("/relationships/{relationship_id}", response_model=dict)
+async def delete_relationship(relationship_id: str):
+    """Delete a relationship"""
+    success = await graph_service.delete_relationship(relationship_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Relationship not found")
+    return {"id": relationship_id, "message": "Relationship deleted"}
+
+
 @router.get("/{node_id}/connections", response_model=dict)
 async def get_connections(node_id: str, max_depth: int = Query(2, ge=1, le=5)):
     """Get all connections for a node"""
@@ -140,3 +184,11 @@ async def get_node(node_id: str):
     except Exception as e:
         # Surface unexpected errors with a clear message
         raise HTTPException(status_code=500, detail=f"Failed to fetch node: {str(e)}")
+
+@router.delete("/{node_id}", response_model=dict)
+async def delete_node(node_id: str):
+    """Delete a node by ID (and its relationships)"""
+    success = await graph_service.delete_node(node_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Node not found")
+    return {"id": node_id, "message": "Node deleted"}

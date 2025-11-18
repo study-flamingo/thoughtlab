@@ -5,7 +5,7 @@ This document maps the repository’s structure, major components, and the respo
 ## High-level architecture
 - **Backend**: FastAPI (Python) with Neo4j (primary store), Redis (cache/RT), optional Postgres (scaffolded)
 - **Frontend**: React + TypeScript + Vite + Tailwind + React Query + Cytoscape.js
-- **Infra**: Docker Compose for Neo4j, Postgres, Redis
+- **Infra**: Docker Compose for Neo4j and Redis
 - **Tests**: pytest (backend), vitest/testing-library (frontend)
 
 ## Backend (FastAPI)
@@ -73,7 +73,7 @@ This document maps the repository’s structure, major components, and the respo
 
 ## Orchestration & scripts
 - Compose services
-  - [docker-compose.yml](../docker-compose.yml): Neo4j (+APOC), Postgres, Redis with health checks and volumes.
+  - [docker-compose.yml](../docker-compose.yml): Neo4j (+APOC) and Redis with health checks and volumes.
   - Neo4j init: [docker/neo4j/init.cypher](../docker/neo4j/init.cypher)
 - Local scripts (root)
   - [scripts/setup.sh](../scripts/setup.sh), [scripts/setup.ps1](../scripts/setup.ps1): End-to-end setup.
@@ -88,7 +88,7 @@ This document maps the repository’s structure, major components, and the respo
   - [03-DEVELOPMENT_ROADMAP.md](./03-DEVELOPMENT_ROADMAP.md)
   - [04-TECHNICAL_SETUP_GUIDE.md](./04-TECHNICAL_SETUP_GUIDE.md)
 - Top-level guides
-  - [README.md](./README.md)
+  - [README.md](../README.md)
   - [BACKEND_SETUP.md](./BACKEND_SETUP.md)
   - [FRONTEND_SETUP.md](./FRONTEND_SETUP.md)
   - [UV_SETUP.md](./UV_SETUP.md)

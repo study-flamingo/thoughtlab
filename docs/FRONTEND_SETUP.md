@@ -102,7 +102,7 @@ Frontend will be available at http://localhost:5173
 Make sure backend is running:
 ```bash
 cd backend
-source venv/bin/activate
+source .venv/bin/activate
 uvicorn app.main:app --reload
 ```
 

@@ -56,3 +56,7 @@ htmlcov/
 *.tmp
 *.bak
 *.swp
+
+# Private Cursor files
+.cursor/.*
+.cursor/rules/.*

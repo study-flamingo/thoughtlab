@@ -131,6 +131,29 @@ CREATE INDEX observation_created IF NOT EXISTS
 FOR (o:Observation) ON o.created_at;
 ```
 
+### UUID ID Policy and Backfill
+
+All node and relationship identifiers use UUIDv4 stored in property `id`. If you are upgrading an existing database that previously relied on internal relationship IDs, run the following once:
+
+```cypher
+// Assign UUIDs to existing relationships
+MATCH ()-[r]->()
+WHERE r.id IS NULL
+SET r.id = randomUUID();
+```
+
+Optional relationship ID indexes (Neo4j 5+):
+
+```cypher
+CREATE INDEX rel_id_supports IF NOT EXISTS FOR ()-[r:SUPPORTS]-() ON (r.id);
+CREATE INDEX rel_id_contradicts IF NOT EXISTS FOR ()-[r:CONTRADICTS]-() ON (r.id);
+CREATE INDEX rel_id_relates IF NOT EXISTS FOR ()-[r:RELATES_TO]-() ON (r.id);
+```
+
+References:
+- Cypher functions (randomUUID): https://neo4j.com/docs/cypher-manual/4.3/functions/
+- Relationship index hint format (Neo4j 5): https://neo4j.com/docs/status-codes/current/notifications/all-notifications/
+
 ## Troubleshooting
 
 - **Port conflicts:** Change ports in docker-compose.yml if needed

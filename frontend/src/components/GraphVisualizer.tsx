@@ -101,28 +101,50 @@ const cytoscapeStylesheet = [
 interface Props {
   onNodeSelect?: (nodeId: string | null) => void;
   selectedNodeId?: string | null;
+  onEdgeSelect?: (edgeId: string | null) => void;
+  selectedEdgeId?: string | null;
 }
 
-export default function GraphVisualizer({ onNodeSelect, selectedNodeId: externalSelectedNodeId }: Props) {
+export default function GraphVisualizer({ 
+  onNodeSelect, 
+  selectedNodeId: externalSelectedNodeId,
+  onEdgeSelect,
+  selectedEdgeId: externalSelectedEdgeId,
+}: Props) {
   const cyRef = useRef<Core | null>(null);
   const [isReady, setIsReady] = useState<boolean>(false);
   const setupDoneRef = useRef<boolean>(false);
   const onNodeSelectRef = useRef(onNodeSelect);
+  const onEdgeSelectRef = useRef(onEdgeSelect);
   const [internalSelectedNodeId, setInternalSelectedNodeId] = useState<string | null>(null);
+  const [internalSelectedEdgeId, setInternalEdgeId] = useState<string | null>(null);
   
-  // Keep the ref updated with the latest callback
+  // Keep the refs updated with the latest callbacks
   useEffect(() => {
     onNodeSelectRef.current = onNodeSelect;
   }, [onNodeSelect]);
   
+  useEffect(() => {
+    onEdgeSelectRef.current = onEdgeSelect;
+  }, [onEdgeSelect]);
+  
   // Use external selectedNodeId if provided, otherwise use internal state
   const selectedNodeId = externalSelectedNodeId !== undefined ? externalSelectedNodeId : internalSelectedNodeId;
+  const selectedEdgeId = externalSelectedEdgeId !== undefined ? externalSelectedEdgeId : internalSelectedEdgeId;
   
   const setSelectedNodeId = (id: string | null) => {
     if (onNodeSelectRef.current) {
       onNodeSelectRef.current(id);
     } else {
       setInternalSelectedNodeId(id);
+    }
+  };
+
+  const setSelectedEdgeId = (id: string | null) => {
+    if (onEdgeSelectRef.current) {
+      onEdgeSelectRef.current(id);
+    } else {
+      setInternalEdgeId(id);
     }
   };
 
@@ -159,15 +181,21 @@ export default function GraphVisualizer({ onNodeSelect, selectedNodeId: external
           };
         }),
         // Edges
-        ...data.edges.map((edge: GraphEdge) => ({
-          data: {
-            id: edge.id,
-            source: edge.source,
-            target: edge.target,
-            type: edge.type,
-            ...edge,
-          },
-        })),
+        ...data.edges.map((edge: GraphEdge) => {
+          // Use the edge ID from backend (Neo4j internal ID, can be "0", "1", etc.)
+          // If missing, create a composite key as fallback
+          const edgeId = edge.id !== undefined && edge.id !== null ? String(edge.id) : `edge-${edge.source}-${edge.target}-${edge.type}`;
+          return {
+            data: {
+              // Spread edge properties first, then override with our id to ensure it's set correctly
+              ...edge,
+              id: edgeId,
+              source: edge.source,
+              target: edge.target,
+              type: edge.type,
+            },
+          };
+        }),
       ]
     : [];
 
@@ -190,6 +218,7 @@ export default function GraphVisualizer({ onNodeSelect, selectedNodeId: external
         if (target === cy || typeof target?.isNode !== 'function') {
           console.log('Background tapped, deselecting'); // Debug log
           setSelectedNodeId(null);
+          setSelectedEdgeId(null);
           if (!cy.destroyed()) {
             cy.elements().removeClass('highlighted');
           }
@@ -198,9 +227,10 @@ export default function GraphVisualizer({ onNodeSelect, selectedNodeId: external
 
         // Node taps: select and highlight
         if (target.isNode()) {
-          const nodeId = target.id();
+          const nodeId = target.data('id') || target.id();
           console.log('Node tapped:', nodeId); // Debug log
           setSelectedNodeId(nodeId);
+          setSelectedEdgeId(null); // Clear edge selection when node is selected
           if (!cy.destroyed()) {
             cy.elements().removeClass('highlighted');
             target.addClass('highlighted');
@@ -209,9 +239,29 @@ export default function GraphVisualizer({ onNodeSelect, selectedNodeId: external
           return;
         }
 
-        // Edge or other element taps: treat as background for now
-        console.log('Non-node element tapped, deselecting'); // Debug log
+        // Edge taps: select and highlight
+        if (target.isEdge()) {
+          const edgeId = target.data('id');
+          // Check for null/undefined explicitly (not truthiness, since "0" is falsy)
+          if (edgeId !== null && edgeId !== undefined && !String(edgeId).startsWith('edge-')) {
+            // This is a real relationship ID from the backend
+            setSelectedEdgeId(String(edgeId));
+            setSelectedNodeId(null); // Clear node selection when edge is selected
+            if (!cy.destroyed()) {
+              cy.elements().removeClass('highlighted');
+              target.addClass('highlighted');
+              // Also highlight connected nodes
+              target.source().addClass('highlighted');
+              target.target().addClass('highlighted');
+            }
+          }
+          return;
+        }
+
+        // Other element taps: deselect
+        console.log('Other element tapped, deselecting'); // Debug log
         setSelectedNodeId(null);
+        setSelectedEdgeId(null);
         if (!cy.destroyed()) {
           cy.elements().removeClass('highlighted');
         }
@@ -245,7 +295,7 @@ export default function GraphVisualizer({ onNodeSelect, selectedNodeId: external
     try {
       cy.style().append([
         {
-          selector: '.highlighted',
+          selector: 'node.highlighted',
           style: {
             'border-width': 3,
             'border-color': '#F59E0B',
@@ -262,11 +312,48 @@ export default function GraphVisualizer({ onNodeSelect, selectedNodeId: external
             },
           },
         },
+        {
+          selector: 'edge.highlighted',
+          style: {
+            'line-color': '#F59E0B',
+            'target-arrow-color': '#F59E0B',
+            width: 4,
+            'z-index': 10,
+          },
+        },
       ]);
     } catch (error) {
       console.warn('Failed to append highlight styles:', error);
     }
   }, []);
+
+  // Update highlight based on selected edge
+  useEffect(() => {
+    const cy = cyRef.current;
+    if (!cy || !isReady || cy.destroyed() || !data) return;
+
+    try {
+      // Remove all highlights first
+      cy.elements().removeClass('highlighted');
+      
+      if (selectedEdgeId !== null && selectedEdgeId !== undefined) {
+        const edge = cy.getElementById(selectedEdgeId);
+        if (edge.length > 0) {
+          edge.addClass('highlighted');
+          edge.source().addClass('highlighted');
+          edge.target().addClass('highlighted');
+        }
+      } else if (selectedNodeId !== null && selectedNodeId !== undefined) {
+        const node = cy.getElementById(selectedNodeId);
+        if (node.length > 0) {
+          node.addClass('highlighted');
+          node.neighborhood().addClass('highlighted');
+        }
+      }
+    } catch (error) {
+      console.warn('Error updating highlights:', error);
+    }
+  }, [selectedEdgeId, selectedNodeId, isReady, data]);
 
   // Cleanup on unmount
   useEffect(() => {

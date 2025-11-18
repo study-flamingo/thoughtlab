@@ -4,7 +4,7 @@
 
 ### 1. Database Connections ✅
 - **Neo4j**: Connection manager with async support (`app/db/neo4j.py`)
-- **PostgreSQL**: SQLAlchemy async engine (`app/db/postgres.py`)
+- **PostgreSQL**: SQLAlchemy async engine (`app/db/postgres.py`) — scaffolded; optional, not used by default
 - **Redis**: Async Redis client (`app/db/redis.py`)
 
 ### 2. Neo4j Initialization ✅
@@ -53,9 +53,9 @@ Enhanced health endpoint at `/health` that checks:
 
 ```bash
 cd backend
-python3 -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-pip install -r requirements.txt
+uv venv
+source .venv/bin/activate  # On Windows: .\.venv\Scripts\Activate.ps1
+uv pip install -r requirements.txt
 ```
 
 ### 2. Verify .env File
@@ -68,7 +68,7 @@ Make sure `backend/.env` exists and has correct values:
 
 ```bash
 cd backend
-source venv/bin/activate
+source .venv/bin/activate
 uvicorn app.main:app --reload
 ```
 

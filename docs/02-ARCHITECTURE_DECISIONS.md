@@ -715,3 +715,45 @@ These decisions create a modern, Python-centric stack optimized for:
 - Type safety and maintainability (TypeScript, Pydantic)
 
 The architecture balances power with pragmatism, avoiding over-engineering while providing room to grow.
+
+---
+
+## ADR-011: Identifier Strategy (UUIDv4)
+
+### Decision
+Use UUIDv4 (string) as the canonical identifier for all domain entities and relationships.
+
+### Context
+- Neo4j’s internal element IDs (`id(n)`, `id(r)`) are not stable across export/import and can be reused.
+- Nodes already use a UUIDv4 in property `id`. We standardize relationships to also have a UUIDv4 property `id`.
+- All API endpoints and the frontend treat IDs as opaque strings.
+
+### Implementation
+- Nodes: property `id` set server-side via Python `uuid.uuid4()`.
+- Relationships: property `id` set on creation and used for all lookups and updates.
+- Cypher patterns use `WHERE r.id = $rel_id` and `WHERE n.id = $id`. We do not use `id()` for application-level lookup.
+- Full graph API returns `r.id` for edge identifiers.
+
+### Migration (if upgrading existing data)
+Backfill relationship IDs once:
+
+```cypher
+MATCH ()-[r]->()
+WHERE r.id IS NULL
+SET r.id = randomUUID();
+```
+
+Optional (Neo4j 5+): add relationship property indexes for lookup by `id`:
+
+```cypher
+CREATE INDEX rel_id_supports IF NOT EXISTS FOR ()-[r:SUPPORTS]-() ON (r.id);
+CREATE INDEX rel_id_contradicts IF NOT EXISTS FOR ()-[r:CONTRADICTS]-() ON (r.id);
+CREATE INDEX rel_id_relates IF NOT EXISTS FOR ()-[r:RELATES_TO]-() ON (r.id);
+```
+
+### Frontend considerations
+- Treat IDs as strings and use explicit null/undefined checks in conditional rendering.
+
+### References
+- Cypher functions (randomUUID): https://neo4j.com/docs/cypher-manual/4.3/functions/
+- Relationship index hint format (Neo4j 5): https://neo4j.com/docs/status-codes/current/notifications/all-notifications/

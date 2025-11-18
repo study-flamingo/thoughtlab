@@ -3,7 +3,7 @@ import type {
   GraphData,
   CreateObservationData,
   GraphNode,
-  ConnectionSuggestion,
+  RelationshipResponse,
 } from '../types/graph';
 
 const api = axios.create({
@@ -42,6 +42,9 @@ export const graphApi = {
 
   createEntity: (data: { name: string; entity_type?: string; description?: string }) =>
     api.post<{ id: string; message: string }>('/nodes/entities', data),
+
+  createSource: (data: { title: string; url?: string; source_type?: string; content?: string; published_date?: string }) =>
+    api.post<{ id: string; message: string }>('/nodes/sources', data),
 
   getNode: (id: string) => api.get<GraphNode>(`/nodes/${id}`),
 
@@ -86,6 +89,38 @@ export const graphApi = {
       inverse_confidence: options?.inverse_confidence,
       inverse_notes: options?.inverse_notes,
     }),
+
+  getRelationship: (relationshipId: string) =>
+    api.get<RelationshipResponse>(`/nodes/relationships/${relationshipId}`),
+
+  updateRelationship: (
+    relationshipId: string,
+    data: {
+      relationship_type?: string;
+      confidence?: number;
+      notes?: string;
+      inverse_relationship_type?: string;
+      inverse_confidence?: number;
+      inverse_notes?: string;
+    }
+  ) =>
+    api.put<{ id: string; message: string }>(`/nodes/relationships/${relationshipId}`, data),
+  
+  deleteRelationship: (relationshipId: string) =>
+    api.delete<{ id: string; message: string }>(`/nodes/relationships/${relationshipId}`),
+
+  deleteNode: (nodeId: string) =>
+    api.delete<{ id: string; message: string }>(`/nodes/${nodeId}`),
+
+  // Settings
+  getSettings: () => api.get('/settings'),
+  updateSettings: (data: {
+    theme?: 'light' | 'dark';
+    show_edge_labels?: boolean;
+    default_relation_confidence?: number;
+    layout_name?: 'cose' | 'grid' | 'circle';
+    animate_layout?: boolean;
+  }) => api.put('/settings', data),
 
   approveSuggestion: (suggestionId: string) =>
     api.post(`/suggestions/${suggestionId}/approve`),

@@ -125,6 +125,15 @@ class RelationshipCreate(BaseModel):
     inverse_notes: Optional[str] = None
 
 
+class RelationshipUpdate(BaseModel):
+    confidence: Optional[float] = Field(None, ge=0.0, le=1.0)
+    notes: Optional[str] = None
+    relationship_type: Optional[RelationshipType] = None
+    inverse_relationship_type: Optional[RelationshipType] = None
+    inverse_confidence: Optional[float] = Field(None, ge=0.0, le=1.0)
+    inverse_notes: Optional[str] = None
+
+
 class RelationshipResponse(BaseModel):
     id: str
     from_id: str
@@ -132,4 +141,7 @@ class RelationshipResponse(BaseModel):
     relationship_type: RelationshipType
     confidence: Optional[float] = None
     notes: Optional[str] = None
+    inverse_relationship_type: Optional[RelationshipType] = None
+    inverse_confidence: Optional[float] = None
+    inverse_notes: Optional[str] = None
     created_at: Optional[datetime] = None

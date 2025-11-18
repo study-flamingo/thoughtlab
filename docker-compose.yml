@@ -24,24 +24,6 @@ services:
       timeout: 10s
       retries: 10
 
-  postgres:
-    image: postgres:15-alpine
-    container_name: research-graph-postgres
-    restart: unless-stopped
-    ports:
-      - "5432:5432"
-    environment:
-      - POSTGRES_USER=research_user
-      - POSTGRES_PASSWORD=research_db_password
-      - POSTGRES_DB=research_graph
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U research_user -d research_graph"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
   redis:
     image: redis:7-alpine
     container_name: research-graph-redis
@@ -61,5 +43,4 @@ volumes:
   neo4j_data:
   neo4j_logs:
   neo4j_import:
-  postgres_data:
   redis_data:

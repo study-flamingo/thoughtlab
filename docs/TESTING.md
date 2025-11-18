@@ -10,8 +10,9 @@ Backend tests use `pytest` with async support.
 
 ```bash
 cd backend
-source venv/bin/activate
-pip install -r requirements.txt  # Includes pytest
+uv venv
+source .venv/bin/activate  # On Windows: .\.venv\Scripts\Activate.ps1
+uv pip install -r requirements.txt  # Includes pytest
 ```
 
 ### Running Tests
