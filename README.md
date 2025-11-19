@@ -67,9 +67,9 @@ This will:
 
 **Done!** Open http://localhost:5173 to see your graph.
 
-> **First time?** See [Quick Start](#quick-start) below for detailed setup including Neo4j initialization.
+> **First time?** See [Quickstart](#quickstart) below for detailed setup including Neo4j initialization.
 
-## Quick Start
+## Custom Start
 
 ### Prerequisites
 

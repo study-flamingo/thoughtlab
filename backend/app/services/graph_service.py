@@ -20,6 +20,7 @@ from datetime import datetime, UTC
 from neo4j.time import DateTime as Neo4jDateTime, Date as Neo4jDate, Time as Neo4jTime
 import uuid
 from typing import List, Optional, Dict, Any
+import json
 
 
 class GraphService:
@@ -698,6 +699,25 @@ class GraphService:
             record = await result.single()
             node = dict(record["s"])
             # Normalize into AppSettings
+            # Decode JSON-encoded complex settings if present
+            raw_node_colors = node.get("node_colors", None)
+            if isinstance(raw_node_colors, str):
+                try:
+                    decoded_node_colors = json.loads(raw_node_colors)
+                except Exception:
+                    decoded_node_colors = None
+            else:
+                decoded_node_colors = None
+
+            raw_relation_styles = node.get("relation_styles", None)
+            if isinstance(raw_relation_styles, str):
+                try:
+                    decoded_relation_styles = json.loads(raw_relation_styles)
+                except Exception:
+                    decoded_relation_styles = None
+            else:
+                decoded_relation_styles = None
+
             settings = AppSettings(
                 id=node.get("id", "app"),
                 theme=node.get("theme", "light"),
@@ -705,6 +725,8 @@ class GraphService:
                 default_relation_confidence=float(node.get("default_relation_confidence", 0.8)),
                 layout_name=node.get("layout_name", "cose"),
                 animate_layout=bool(node.get("animate_layout", False)),
+                node_colors=decoded_node_colors or AppSettings().node_colors,
+                relation_styles=decoded_relation_styles or AppSettings().relation_styles,
             )
             return settings.model_dump()
 
@@ -722,6 +744,22 @@ class GraphService:
             updates["layout_name"] = update.layout_name
         if update.animate_layout is not None:
             updates["animate_layout"] = update.animate_layout
+        if update.node_colors is not None:
+            # Store as JSON string to comply with Neo4j property constraints
+            try:
+                updates["node_colors"] = json.dumps(update.node_colors)
+            except Exception:
+                # Fallback to empty dict JSON
+                updates["node_colors"] = json.dumps({})
+        if update.relation_styles is not None:
+            # Convert RelationStyle models to dicts, then JSON-encode
+            try:
+                relation_styles_dict = {
+                    k: (v.model_dump() if hasattr(v, "model_dump") else v) for k, v in update.relation_styles.items()
+                }
+                updates["relation_styles"] = json.dumps(relation_styles_dict)
+            except Exception:
+                updates["relation_styles"] = json.dumps({})
 
         if not updates:
             # No-op; just return current settings
@@ -743,6 +781,25 @@ class GraphService:
             result = await session.run(query, **params)
             record = await result.single()
             node = dict(record["s"])
+            # Decode JSON-encoded complex settings if present
+            raw_node_colors = node.get("node_colors", None)
+            if isinstance(raw_node_colors, str):
+                try:
+                    decoded_node_colors = json.loads(raw_node_colors)
+                except Exception:
+                    decoded_node_colors = None
+            else:
+                decoded_node_colors = None
+
+            raw_relation_styles = node.get("relation_styles", None)
+            if isinstance(raw_relation_styles, str):
+                try:
+                    decoded_relation_styles = json.loads(raw_relation_styles)
+                except Exception:
+                    decoded_relation_styles = None
+            else:
+                decoded_relation_styles = None
+
             settings = AppSettings(
                 id=node.get("id", "app"),
                 theme=node.get("theme", "light"),
@@ -750,6 +807,8 @@ class GraphService:
                 default_relation_confidence=float(node.get("default_relation_confidence", 0.8)),
                 layout_name=node.get("layout_name", "cose"),
                 animate_layout=bool(node.get("animate_layout", False)),
+                node_colors=decoded_node_colors or AppSettings().node_colors,
+                relation_styles=decoded_relation_styles or AppSettings().relation_styles,
             )
             return settings.model_dump()
 

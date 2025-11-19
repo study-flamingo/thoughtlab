@@ -8,3 +8,4 @@
    - Future Development ideas: [03-DEVELOPMENT_ROADMAP.md](../../docs/03-DEVELOPMENT_ROADMAP.md)
    - Testing: [TESTING.md](../../docs/TESTING.md)
 3. Current documentation is a priority. When making changes that may impact end-user workflows, be sure to update any relevant documentation, including the [README.md](../../README.md), [PROJECT_MAP.md](../../docs/PROJECT_MAP.md), and [SETUP.md](../../docs/SETUP.md) if appropriate.
+4. Always reference the most current documentation possible for packages, depending on the version we are using. **Use the context7 MCP server**

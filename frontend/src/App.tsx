@@ -5,10 +5,12 @@ import NodeInspector from './components/NodeInspector';
 import RelationInspector from './components/RelationInspector';
 import CreateNodeModal from './components/CreateNodeModal';
 import CreateRelationModal from './components/CreateRelationModal';
+import SettingsModal from './components/SettingsModal';
 
 function App() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isCreateRelationOpen, setIsCreateRelationOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
 
@@ -40,16 +42,23 @@ function App() {
   };
 
   return (
-    <div className="h-screen flex flex-col bg-gray-100">
+    <div className="h-screen flex flex-col bg-gray-100 text-gray-900 dark:bg-gray-900 dark:text-gray-100">
       {/* Header */}
-      <header className="bg-white shadow-sm border-b px-6 py-4 flex justify-between items-center">
-        <h1 className="text-xl font-semibold text-gray-800">
-          Research Connection Graph
+      <header className="bg-white shadow-sm border-b px-6 py-4 flex justify-between items-center dark:bg-gray-800 dark:border-gray-700">
+        <h1 className="text-xl font-semibold font-[Geo] text-4xl text-gray-800 dark:text-gray-100">
+          toughtlab.ai alpha 0.1.0
         </h1>
         <div className="flex items-center gap-2">
           <button
+            onClick={() => setIsSettingsOpen(true)}
+            className="bg-white text-gray-800 px-3 py-2 rounded-md border hover:bg-gray-50 transition-colors dark:bg-gray-800 dark:text-gray-100 dark:border-gray-700 dark:hover:bg-gray-700"
+            title="Open Settings"
+          >
+            Settings
+          </button>
+          <button
             onClick={() => setIsCreateRelationOpen(true)}
-            className="bg-white text-gray-800 px-4 py-2 rounded-md border hover:bg-gray-50 transition-colors"
+            className="bg-white text-gray-800 px-4 py-2 rounded-md border hover:bg-gray-50 transition-colors dark:bg-gray-800 dark:text-gray-100 dark:border-gray-700 dark:hover:bg-gray-700"
           >
             Add Relation
           </button>
@@ -76,7 +85,7 @@ function App() {
         </main>
 
         {/* Sidebar - Show RelationInspector if edge selected, NodeInspector if node selected, otherwise ActivityFeed */}
-        <aside className="w-80 bg-white border-l shadow-sm overflow-hidden flex flex-col">
+        <aside className="w-80 bg-white border-l shadow-sm overflow-hidden flex flex-col dark:bg-gray-800 dark:border-gray-700">
           {(() => {
             console.log('Sidebar render check - selectedEdgeId:', selectedEdgeId, 'selectedNodeId:', selectedNodeId);
             if (selectedEdgeId !== null && selectedEdgeId !== undefined) {
@@ -99,6 +108,11 @@ function App() {
       {/* Create Relation Modal */}
       {isCreateRelationOpen && (
         <CreateRelationModal onClose={() => setIsCreateRelationOpen(false)} />
+      )}
+      
+      {/* Settings Modal */}
+      {isSettingsOpen && (
+        <SettingsModal onClose={() => setIsSettingsOpen(false)} />
       )}
     </div>
   );

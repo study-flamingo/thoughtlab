@@ -5,6 +5,7 @@ import type {
   GraphNode,
   RelationshipResponse,
 } from '../types/graph';
+import type { AppSettings, AppSettingsUpdate } from '../types/settings';
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1',
@@ -113,14 +114,8 @@ export const graphApi = {
     api.delete<{ id: string; message: string }>(`/nodes/${nodeId}`),
 
   // Settings
-  getSettings: () => api.get('/settings'),
-  updateSettings: (data: {
-    theme?: 'light' | 'dark';
-    show_edge_labels?: boolean;
-    default_relation_confidence?: number;
-    layout_name?: 'cose' | 'grid' | 'circle';
-    animate_layout?: boolean;
-  }) => api.put('/settings', data),
+  getSettings: () => api.get<AppSettings>('/settings'),
+  updateSettings: (data: AppSettingsUpdate) => api.put<AppSettings>('/settings', data),
 
   approveSuggestion: (suggestionId: string) =>
     api.post(`/suggestions/${suggestionId}/approve`),
