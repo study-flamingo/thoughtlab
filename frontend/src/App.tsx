@@ -14,32 +14,25 @@ function App() {
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
 
-  // Debug: Track state changes
-  useEffect(() => {
-    console.log('useEffect: selectedEdgeId changed to:', selectedEdgeId);
-  }, [selectedEdgeId]);
-
   // Callback for edge selection - wrap in useCallback to ensure stability
   const handleEdgeSelect = useCallback((id: string | null) => {
-    console.log('handleEdgeSelect CALLED with id:', id);
-    // Use functional update to ensure React processes it
-    setSelectedEdgeId(() => {
-      console.log('Inside setSelectedEdgeId updater, returning:', id);
-      return id;
-    });
-    setSelectedNodeId(() => null);
+    setSelectedEdgeId(id);
+    // Only clear node selection when an edge is actually selected,
+    // not when clearing edge selection (id === null)
+    if (id !== null) {
+      setSelectedNodeId(null);
+    }
   }, []);
 
-  // Callback for node selection
-  const handleNodeSelect = (id: string | null) => {
+  // Callback for node selection - wrap in useCallback to ensure stability
+  const handleNodeSelect = useCallback((id: string | null) => {
     setSelectedNodeId(id);
-    // Only clear edge selection when a node is actually selected.
-    // Do NOT clear when the intent is just to clear node selection (id === null),
-    // e.g. when an edge is selected and we programmatically clear node selection.
+    // Only clear edge selection when a node is actually selected,
+    // not when clearing node selection (id === null)
     if (id !== null) {
       setSelectedEdgeId(null);
     }
-  };
+  }, []);
 
   return (
     <div className="h-screen flex flex-col bg-gray-100 text-gray-900 dark:bg-gray-900 dark:text-gray-100">
@@ -86,17 +79,13 @@ function App() {
 
         {/* Sidebar - Show RelationInspector if edge selected, NodeInspector if node selected, otherwise ActivityFeed */}
         <aside className="w-80 bg-white border-l shadow-sm overflow-hidden flex flex-col dark:bg-gray-800 dark:border-gray-700">
-          {(() => {
-            console.log('Sidebar render check - selectedEdgeId:', selectedEdgeId, 'selectedNodeId:', selectedNodeId);
-            if (selectedEdgeId !== null && selectedEdgeId !== undefined) {
-              console.log('Rendering RelationInspector');
-              return <RelationInspector relationshipId={selectedEdgeId} onClose={() => setSelectedEdgeId(null)} />;
-            } else if (selectedNodeId !== null && selectedNodeId !== undefined) {
-              return <NodeInspector nodeId={selectedNodeId} onClose={() => setSelectedNodeId(null)} />;
-            } else {
-              return <ActivityFeed />;
-            }
-          })()}
+          {selectedEdgeId != null ? (
+            <RelationInspector relationshipId={selectedEdgeId} onClose={() => setSelectedEdgeId(null)} />
+          ) : selectedNodeId != null ? (
+            <NodeInspector nodeId={selectedNodeId} onClose={() => setSelectedNodeId(null)} />
+          ) : (
+            <ActivityFeed />
+          )}
         </aside>
       </div>
 

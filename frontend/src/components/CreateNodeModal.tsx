@@ -8,12 +8,22 @@ interface Props {
 
 export default function CreateNodeModal({ onClose }: Props) {
   const [nodeType, setNodeType] = useState('observation');
+  // Observation fields
   const [text, setText] = useState('');
   const [confidence, setConfidence] = useState(0.8);
+  // Source fields
   const [title, setTitle] = useState('');
   const [url, setUrl] = useState('');
+  // Entity fields
   const [entityName, setEntityName] = useState('');
   const [entityDescription, setEntityDescription] = useState('');
+  // Hypothesis fields
+  const [claim, setClaim] = useState('');
+  const [status, setStatus] = useState('proposed');
+  // Concept fields
+  const [conceptName, setConceptName] = useState('');
+  const [conceptDescription, setConceptDescription] = useState('');
+  const [domain, setDomain] = useState('general');
 
   const queryClient = useQueryClient();
 
@@ -42,6 +52,24 @@ export default function CreateNodeModal({ onClose }: Props) {
     },
   });
 
+  const createHypothesisMutation = useMutation({
+    mutationFn: (payload: { claim: string; status?: string }) =>
+      graphApi.createHypothesis(payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['graph'] });
+      onClose();
+    },
+  });
+
+  const createConceptMutation = useMutation({
+    mutationFn: (payload: { name: string; description?: string; domain?: string }) =>
+      graphApi.createConcept(payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['graph'] });
+      onClose();
+    },
+  });
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (nodeType === 'observation') {
@@ -56,8 +84,18 @@ export default function CreateNodeModal({ onClose }: Props) {
         title,
         url: url || undefined,
       });
+    } else if (nodeType === 'hypothesis') {
+      createHypothesisMutation.mutate({
+        claim,
+        status: status || undefined,
+      });
+    } else if (nodeType === 'concept') {
+      createConceptMutation.mutate({
+        name: conceptName,
+        description: conceptDescription || undefined,
+        domain: domain || undefined,
+      });
     }
-    // TODO: Handle other node types (hypothesis, source, concept)
   };
 
   return (
@@ -188,6 +226,86 @@ export default function CreateNodeModal({ onClose }: Props) {
             </>
           )}
 
+          {nodeType === 'hypothesis' && (
+            <>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Claim
+                </label>
+                <textarea
+                  value={claim}
+                  onChange={(e) => setClaim(e.target.value)}
+                  className="w-full border rounded-md px-3 py-2 h-32 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="State your hypothesis..."
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Status
+                </label>
+                <select
+                  value={status}
+                  onChange={(e) => setStatus(e.target.value)}
+                  className="w-full border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="proposed">Proposed</option>
+                  <option value="tested">Tested</option>
+                  <option value="confirmed">Confirmed</option>
+                  <option value="rejected">Rejected</option>
+                </select>
+              </div>
+            </>
+          )}
+
+          {nodeType === 'concept' && (
+            <>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Concept Name
+                </label>
+                <input
+                  type="text"
+                  value={conceptName}
+                  onChange={(e) => setConceptName(e.target.value)}
+                  className="w-full border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Enter concept name..."
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Description (optional)
+                </label>
+                <textarea
+                  value={conceptDescription}
+                  onChange={(e) => setConceptDescription(e.target.value)}
+                  className="w-full border rounded-md px-3 py-2 h-24 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Describe the concept..."
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Domain
+                </label>
+                <select
+                  value={domain}
+                  onChange={(e) => setDomain(e.target.value)}
+                  className="w-full border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="general">General</option>
+                  <option value="science">Science</option>
+                  <option value="technology">Technology</option>
+                  <option value="philosophy">Philosophy</option>
+                  <option value="mathematics">Mathematics</option>
+                  <option value="social">Social Sciences</option>
+                  <option value="humanities">Humanities</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+            </>
+          )}
+
           <div className="flex justify-end gap-3 pt-4">
             <button
               type="button"
@@ -198,10 +316,22 @@ export default function CreateNodeModal({ onClose }: Props) {
             </button>
             <button
               type="submit"
-              disabled={createObservationMutation.isPending || createEntityMutation.isPending || createSourceMutation.isPending}
+              disabled={
+                createObservationMutation.isPending || 
+                createEntityMutation.isPending || 
+                createSourceMutation.isPending ||
+                createHypothesisMutation.isPending ||
+                createConceptMutation.isPending
+              }
               className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              {(createObservationMutation.isPending || createEntityMutation.isPending || createSourceMutation.isPending) ? 'Creating...' : 'Create Node'}
+              {(
+                createObservationMutation.isPending || 
+                createEntityMutation.isPending || 
+                createSourceMutation.isPending ||
+                createHypothesisMutation.isPending ||
+                createConceptMutation.isPending
+              ) ? 'Creating...' : 'Create Node'}
             </button>
           </div>
         </form>

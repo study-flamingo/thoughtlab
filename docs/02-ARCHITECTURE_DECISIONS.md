@@ -713,8 +713,9 @@ These decisions create a modern, Python-centric stack optimized for:
 - Real-time, async operations (FastAPI, ARQ, WebSocket)
 - Interactive visualization (React, Cytoscape.js)
 - Type safety and maintainability (TypeScript, Pydantic)
+- **Modularity and extensibility** (clear interfaces, separation of concerns)
 
-The architecture balances power with pragmatism, avoiding over-engineering while providing room to grow.
+The architecture balances power with pragmatism, avoiding over-engineering while providing room to grow. All development follows modularity principles (ADR-012) to ensure the codebase can scale with minimal refactoring.
 
 ---
 
@@ -757,3 +758,108 @@ CREATE INDEX rel_id_relates IF NOT EXISTS FOR ()-[r:RELATES_TO]-() ON (r.id);
 ### References
 - Cypher functions (randomUUID): https://neo4j.com/docs/cypher-manual/4.3/functions/
 - Relationship index hint format (Neo4j 5): https://neo4j.com/docs/status-codes/current/notifications/all-notifications/
+
+---
+
+## ADR-012: Development Principles - Modularity and Extensibility
+
+### Decision
+Design and implement all features with **modularity** as a core principle, ensuring the codebase can grow and evolve with minimal refactoring.
+
+### Context
+This project is intended to grow significantly over time. Early architectural decisions that prioritize modularity will pay dividends as new features are added, reducing technical debt and making onboarding easier.
+
+### Principles
+
+#### 1. Single Responsibility
+Each module, component, service, and function should have **one clear purpose**:
+- Backend services handle one domain area (e.g., `graph_service` handles all Neo4j operations)
+- Frontend components handle one UI concern (e.g., `NodeInspector` displays/edits node details)
+- API routes group related endpoints logically (e.g., `/nodes/*`, `/graph/*`, `/settings/*`)
+
+#### 2. Clear Interfaces
+Modules communicate through **well-defined interfaces**:
+- Backend: Pydantic models define all request/response contracts
+- Frontend: TypeScript types define data structures
+- API: REST endpoints follow consistent naming and response patterns
+- Callbacks: Use stable function references (e.g., `useCallback` in React) to prevent subtle bugs
+
+#### 3. Separation of Concerns
+Keep distinct responsibilities in separate layers:
+- **Backend**: Routes (HTTP handling) → Services (business logic) → Database connectors (data access)
+- **Frontend**: Components (UI rendering) → Hooks/Services (data fetching) → Types (contracts)
+- **State**: Selection state lives in `App.tsx`; visualization state lives in `GraphVisualizer`
+
+#### 4. Minimal Coupling
+Components should have **minimal dependencies** on each other:
+- Prefer props/callbacks over direct imports between components
+- Use React Query for server state (decouples data fetching from components)
+- Avoid circular dependencies between modules
+
+#### 5. Easy Extension Points
+Design with future expansion in mind:
+- New node types: Add to `NodeType` enum, create route handler, update `NodeInspector`
+- New relationship types: Add to `RelationshipType` enum, update Cytoscape styles
+- New visualizations: Graph rendering is isolated in `GraphVisualizer`
+- New settings: Add to `AppSettings` model, update `SettingsModal`
+
+### Implementation Guidelines
+
+**Backend:**
+```python
+# Good: Service handles business logic, route handles HTTP
+@router.post("/nodes/observations")
+async def create_observation(data: ObservationCreate):
+    node_id = await graph_service.create_observation(data)
+    return {"id": node_id, "message": "Observation created"}
+
+# Avoid: Business logic in route handler
+@router.post("/nodes/observations")
+async def create_observation(data: ObservationCreate):
+    # Don't put Cypher queries or complex logic here
+    ...
+```
+
+**Frontend:**
+```typescript
+// Good: Component receives data via props, emits events via callbacks
+function NodeInspector({ nodeId, onClose }: Props) {
+  // Component is reusable and testable
+}
+
+// Good: Callbacks wrapped in useCallback for stable references
+const handleNodeSelect = useCallback((id: string | null) => {
+  setSelectedNodeId(id);
+  if (id !== null) {
+    setSelectedEdgeId(null);
+  }
+}, []);
+
+// Avoid: Hardcoded dependencies, unstable callbacks
+function NodeInspector() {
+  const nodeId = useGlobalStore().selectedNode; // Tight coupling
+}
+```
+
+### Trade-offs
+
+**Pros:**
+- New features require changes in isolated areas
+- Easier to test individual modules
+- Team members can work on different areas without conflicts
+- Bugs are typically isolated to specific modules
+- Onboarding is simpler (can understand one module at a time)
+
+**Cons:**
+- Initial development may feel slower (more structure to set up)
+- Requires discipline to maintain boundaries
+- Some duplication may occur to avoid coupling
+- Need to think ahead about extension points
+
+### Consequences
+
+- All new features should be designed as self-contained modules first
+- Code reviews should check for proper separation of concerns
+- When a module grows too large, split it before it becomes unwieldy
+- Document extension points in code comments for common expansion scenarios
+- Prefer composition over inheritance for code reuse

@@ -23,14 +23,22 @@ export default function NodeInspector({ nodeId, onClose }: Props) {
   useEffect(() => {
     if (node) {
       setFormData({
+        // Observation fields
         text: node.text || '',
+        confidence: node.confidence ?? 0.8,
+        // Source fields
         title: node.title || '',
+        url: (node as any).url || '',
+        source_type: (node as any).source_type || 'paper',
+        // Entity fields
         name: node.name || '',
         description: node.description || '',
-        confidence: node.confidence ?? 0.8,
-        claim: (node as any).claim || '',
-        status: (node as any).status || '',
         entity_type: (node as any).entity_type || 'generic',
+        // Hypothesis fields
+        claim: (node as any).claim || '',
+        status: (node as any).status || 'proposed',
+        // Concept fields
+        domain: (node as any).domain || 'general',
       });
     }
   }, [node]);
@@ -58,6 +66,26 @@ export default function NodeInspector({ nodeId, onClose }: Props) {
   const updateHypothesisMutation = useMutation({
     mutationFn: (data: { claim?: string; status?: string }) =>
       graphApi.updateHypothesis(nodeId!, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['node', nodeId] });
+      queryClient.invalidateQueries({ queryKey: ['graph'] });
+      setIsEditing(false);
+    },
+  });
+
+  const updateSourceMutation = useMutation({
+    mutationFn: (data: { title?: string; url?: string; source_type?: string }) =>
+      graphApi.updateSource(nodeId!, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['node', nodeId] });
+      queryClient.invalidateQueries({ queryKey: ['graph'] });
+      setIsEditing(false);
+    },
+  });
+
+  const updateConceptMutation = useMutation({
+    mutationFn: (data: { name?: string; description?: string; domain?: string }) =>
+      graphApi.updateConcept(nodeId!, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['node', nodeId] });
       queryClient.invalidateQueries({ queryKey: ['graph'] });
@@ -94,6 +122,20 @@ export default function NodeInspector({ nodeId, onClose }: Props) {
         updateHypothesisMutation.mutate({
           claim: formData.claim,
           status: formData.status,
+        });
+        break;
+      case 'Source':
+        updateSourceMutation.mutate({
+          title: formData.title,
+          url: formData.url || undefined,
+          source_type: formData.source_type,
+        });
+        break;
+      case 'Concept':
+        updateConceptMutation.mutate({
+          name: formData.name,
+          description: formData.description || undefined,
+          domain: formData.domain,
         });
         break;
       default:
@@ -143,7 +185,9 @@ export default function NodeInspector({ nodeId, onClose }: Props) {
   const isSaving =
     updateObservationMutation.isPending ||
     updateEntityMutation.isPending ||
-    updateHypothesisMutation.isPending;
+    updateHypothesisMutation.isPending ||
+    updateSourceMutation.isPending ||
+    updateConceptMutation.isPending;
 
   return (
     <div className="h-full flex flex-col">
@@ -307,6 +351,133 @@ export default function NodeInspector({ nodeId, onClose }: Props) {
           </>
         )}
 
+        {node.type === 'Source' && (
+          <>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">
+                Title
+              </label>
+              {isEditing ? (
+                <input
+                  type="text"
+                  value={formData.title}
+                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                  className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              ) : (
+                <p className="text-sm text-gray-700">{node.title || '-'}</p>
+              )}
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">
+                URL
+              </label>
+              {isEditing ? (
+                <input
+                  type="url"
+                  value={formData.url}
+                  onChange={(e) => setFormData({ ...formData, url: e.target.value })}
+                  className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="https://..."
+                />
+              ) : (
+                (node as any).url ? (
+                  <a 
+                    href={(node as any).url} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="text-sm text-blue-600 hover:underline break-all"
+                  >
+                    {(node as any).url}
+                  </a>
+                ) : (
+                  <p className="text-sm text-gray-700">-</p>
+                )
+              )}
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">
+                Source Type
+              </label>
+              {isEditing ? (
+                <select
+                  value={formData.source_type}
+                  onChange={(e) => setFormData({ ...formData, source_type: e.target.value })}
+                  className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="paper">Paper</option>
+                  <option value="article">Article</option>
+                  <option value="book">Book</option>
+                  <option value="website">Website</option>
+                  <option value="forum">Forum</option>
+                  <option value="video">Video</option>
+                  <option value="other">Other</option>
+                </select>
+              ) : (
+                <p className="text-sm text-gray-700">{(node as any).source_type || 'paper'}</p>
+              )}
+            </div>
+          </>
+        )}
+
+        {node.type === 'Concept' && (
+          <>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">
+                Name
+              </label>
+              {isEditing ? (
+                <input
+                  type="text"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              ) : (
+                <p className="text-sm text-gray-700">{node.name || '-'}</p>
+              )}
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">
+                Description
+              </label>
+              {isEditing ? (
+                <textarea
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  rows={4}
+                />
+              ) : (
+                <p className="text-sm text-gray-700 whitespace-pre-wrap">{node.description || '-'}</p>
+              )}
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">
+                Domain
+              </label>
+              {isEditing ? (
+                <select
+                  value={formData.domain}
+                  onChange={(e) => setFormData({ ...formData, domain: e.target.value })}
+                  className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="general">General</option>
+                  <option value="science">Science</option>
+                  <option value="technology">Technology</option>
+                  <option value="philosophy">Philosophy</option>
+                  <option value="mathematics">Mathematics</option>
+                  <option value="social">Social Sciences</option>
+                  <option value="humanities">Humanities</option>
+                  <option value="other">Other</option>
+                </select>
+              ) : (
+                <p className="text-sm text-gray-700">{(node as any).domain || 'general'}</p>
+              )}
+            </div>
+          </>
+        )}
+
         {/* Metadata */}
         <div className="pt-4 border-t space-y-2">
           <div>
@@ -337,13 +508,16 @@ export default function NodeInspector({ nodeId, onClose }: Props) {
                 if (node) {
                   setFormData({
                     text: node.text || '',
+                    confidence: node.confidence ?? 0.8,
                     title: node.title || '',
+                    url: (node as any).url || '',
+                    source_type: (node as any).source_type || 'paper',
                     name: node.name || '',
                     description: node.description || '',
-                    confidence: node.confidence ?? 0.8,
-                    claim: (node as any).claim || '',
-                    status: (node as any).status || '',
                     entity_type: (node as any).entity_type || 'generic',
+                    claim: (node as any).claim || '',
+                    status: (node as any).status || 'proposed',
+                    domain: (node as any).domain || 'general',
                   });
                 }
               }}

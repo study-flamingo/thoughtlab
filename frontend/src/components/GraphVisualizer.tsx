@@ -230,20 +230,15 @@ export default function GraphVisualizer({
   useEffect(() => {
     const cy = cyRef.current;
     if (!cy || cy.destroyed() || !data || !isReady) {
-      console.log('Tap handler setup skipped:', { cy: !!cy, destroyed: cy?.destroyed(), data: !!data, isReady }); // Debug log
       return;
     }
-
-    console.log('Setting up tap handler'); // Debug log
 
     const handleTap = (event: cytoscape.EventObject) => {
       try {
         const target = event.target as any;
-        console.log('Tap event fired, target:', target); // Debug log
 
         // Background/core taps: deselect
         if (target === cy || typeof target?.isNode !== 'function') {
-          console.log('Background tapped, deselecting'); // Debug log
           setSelectedNodeId(null);
           setSelectedEdgeId(null);
           if (!cy.destroyed()) {
@@ -255,9 +250,8 @@ export default function GraphVisualizer({
         // Node taps: select and highlight
         if (target.isNode()) {
           const nodeId = target.data('id') || target.id();
-          console.log('Node tapped:', nodeId); // Debug log
           setSelectedNodeId(nodeId);
-          setSelectedEdgeId(null); // Clear edge selection when node is selected
+          setSelectedEdgeId(null);
           if (!cy.destroyed()) {
             cy.elements().removeClass('highlighted');
             target.addClass('highlighted');
@@ -271,13 +265,11 @@ export default function GraphVisualizer({
           const edgeId = target.data('id');
           // Check for null/undefined explicitly (not truthiness, since "0" is falsy)
           if (edgeId !== null && edgeId !== undefined && !String(edgeId).startsWith('edge-')) {
-            // This is a real relationship ID from the backend
             setSelectedEdgeId(String(edgeId));
-            setSelectedNodeId(null); // Clear node selection when edge is selected
+            setSelectedNodeId(null);
             if (!cy.destroyed()) {
               cy.elements().removeClass('highlighted');
               target.addClass('highlighted');
-              // Also highlight connected nodes
               target.source().addClass('highlighted');
               target.target().addClass('highlighted');
             }
@@ -286,7 +278,6 @@ export default function GraphVisualizer({
         }
 
         // Other element taps: deselect
-        console.log('Other element tapped, deselecting'); // Debug log
         setSelectedNodeId(null);
         setSelectedEdgeId(null);
         if (!cy.destroyed()) {
@@ -297,22 +288,19 @@ export default function GraphVisualizer({
       }
     };
 
-    // Remove any existing tap handlers first to avoid duplicates
     cy.off('tap');
     cy.on('tap', handleTap);
-    console.log('Tap handler attached'); // Debug log
 
     return () => {
       if (cy && !cy.destroyed()) {
         try {
           cy.off('tap', handleTap);
-          console.log('Tap handler removed'); // Debug log
         } catch (error) {
           console.warn('Error removing tap handler:', error);
         }
       }
     };
-  }, [data, isReady]); // setSelectedNodeId uses ref, so no need in deps
+  }, [data, isReady]);
 
   // Add highlight styles
   useEffect(() => {
@@ -534,43 +522,28 @@ export default function GraphVisualizer({
 
             // Prevent multiple setups if already done
             if (setupDoneRef.current && cyRef.current === cy) {
-              console.log('Already set up, skipping'); // Debug log
-              // Don't reset isReady if already set up
               return;
             }
 
             cyRef.current = cy;
-            // Only reset isReady if we're doing a fresh setup
             if (!setupDoneRef.current) {
               setIsReady(false);
-              console.log('Resetting isReady to false for new setup'); // Debug log
             }
 
-            // Set up event listeners and configuration
             const setupCytoscape = () => {
               try {
-                console.log('setupCytoscape called', { destroyed: cy.destroyed(), setupDone: setupDoneRef.current }); // Debug log
                 if (cy.destroyed() || setupDoneRef.current) {
-                  console.log('setupCytoscape skipped - already done or destroyed'); // Debug log
                   return;
                 }
 
-                // Enable pan and zoom
                 cy.userPanningEnabled(true);
                 cy.boxSelectionEnabled(true);
                 cy.zoomingEnabled(true);
                 cy.minZoom(0.1);
                 cy.maxZoom(2);
 
-                // Note: Tap handler is set up in useEffect when data is ready
-
                 setupDoneRef.current = true;
-                console.log('setupDoneRef set to true'); // Debug log
-
-                // Mark as ready immediately since we've set up the instance
-                // The ready event will also fire, but we can mark ready now
                 setIsReady(true);
-                console.log('Cytoscape instance marked as ready immediately'); // Debug log
               } catch (error) {
                 console.warn('Error setting up Cytoscape:', error);
                 setIsReady(false);
@@ -578,45 +551,32 @@ export default function GraphVisualizer({
               }
             };
 
-            // Listen for ready event (only once)
             if (!setupDoneRef.current) {
-              console.log('Setting up ready handler'); // Debug log
               const readyHandler = () => {
-                console.log('Ready event fired'); // Debug log
-                // Ensure ready state is set when ready event fires
                 if (!cy.destroyed() && cy === cyRef.current) {
                   setIsReady(true);
-                  console.log('Ready event: marking instance as ready'); // Debug log
                 }
               };
 
               cy.on('ready', readyHandler);
               
-              // Also set up immediately if already ready
               try {
                 if (cy.container()) {
-                  console.log('Container exists, calling setupCytoscape immediately'); // Debug log
                   setupCytoscape();
                 } else {
-                  console.log('No container yet, scheduling setupCytoscape'); // Debug log
-                  // Fallback: set up after a short delay
                   setTimeout(() => {
                     if (!cy.destroyed() && cy === cyRef.current) {
                       setupCytoscape();
                     }
                   }, 150);
                 }
-              } catch (error) {
-                console.log('Container check failed, using timeout fallback', error); // Debug log
-                // If container check fails, use timeout fallback
+              } catch {
                 setTimeout(() => {
                   if (!cy.destroyed() && cy === cyRef.current) {
                     setupCytoscape();
                   }
                 }, 150);
               }
-            } else {
-              console.log('setupDoneRef already true, skipping setup'); // Debug log
             }
           }}
         />

@@ -1,0 +1,37 @@
+---
+alwaysApply: true
+---
+
+## General Rules
+
+1. Always ask the user before making potentially breaking changes.
+2. To quickly retrieve context for user requests, refer to the project [docs](../../docs/).
+   - High-level overview of project structure: [PROJECT_MAP.md](../../docs/PROJECT_MAP.md)
+   - General summary of this project and the developer's goals: [01-PROJECT_OVERVIEW.md](../../docs/01-PROJECT_OVERVIEW.md)
+   - Rationale for architectural decisions: [02-ARCHITECTURE_DECISIONS.md](../../docs/02-ARCHITECTURE_DECISIONS.md)
+   - Future Development ideas: [03-DEVELOPMENT_ROADMAP.md](../../docs/03-DEVELOPMENT_ROADMAP.md)
+   - Testing: [TESTING.md](../../docs/TESTING.md)
+3. Current documentation is a priority. When making changes that may impact end-user workflows, be sure to update any relevant documentation, including the [README.md](../../README.md), [PROJECT_MAP.md](../../docs/PROJECT_MAP.md), and [SETUP.md](../../docs/SETUP.md) if appropriate.
+4. Always reference the most current documentation possible for packages, depending on the version we are using. **Use the context7 MCP server** proactively.
+
+## Development Principles
+
+Before diving into implementation, keep these core principles in mind throughout development:
+
+### Modularity First
+Design every feature with **modularity** in mind to facilitate easy expansion as the project grows, with minimal refactoring necessary. This means:
+
+- **Single Responsibility**: Each module/component does one thing well
+- **Clear Interfaces**: Use Pydantic models (backend) and TypeScript types (frontend) as contracts
+- **Separation of Concerns**: Routes handle HTTP, services handle business logic, connectors handle data access
+- **Minimal Coupling**: Components communicate via props/callbacks, not global state
+- **Easy Extension Points**: New node types, relationship types, and features should require isolated changes
+
+See [ADR-012: Development Principles](./02-ARCHITECTURE_DECISIONS.md#adr-012-development-principles---modularity-and-extensibility) for detailed guidelines and examples.
+
+### Quality Standards
+- Write tests for new features (pytest for backend, vitest for frontend)
+- Use type hints in Python and TypeScript throughout
+- Keep functions small and focused
+- Document non-obvious decisions in code comments
+- Follow existing patterns in the codebase

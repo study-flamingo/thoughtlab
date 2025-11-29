@@ -47,6 +47,12 @@ export const graphApi = {
   createSource: (data: { title: string; url?: string; source_type?: string; content?: string; published_date?: string }) =>
     api.post<{ id: string; message: string }>('/nodes/sources', data),
 
+  createHypothesis: (data: { claim: string; status?: string }) =>
+    api.post<{ id: string; message: string }>('/nodes/hypotheses', data),
+
+  createConcept: (data: { name: string; description?: string; domain?: string }) =>
+    api.post<{ id: string; message: string }>('/nodes/concepts', data),
+
   getNode: (id: string) => api.get<GraphNode>(`/nodes/${id}`),
 
   updateObservation: (id: string, data: { text?: string; confidence?: number; concept_names?: string[] }) =>
@@ -57,6 +63,12 @@ export const graphApi = {
 
   updateHypothesis: (id: string, data: { claim?: string; status?: string }) =>
     api.put<{ id: string; message: string }>(`/nodes/hypotheses/${id}`, data),
+
+  updateConcept: (id: string, data: { name?: string; description?: string; domain?: string }) =>
+    api.put<{ id: string; message: string }>(`/nodes/concepts/${id}`, data),
+
+  updateSource: (id: string, data: { title?: string; url?: string; source_type?: string; content?: string }) =>
+    api.put<{ id: string; message: string }>(`/nodes/sources/${id}`, data),
 
   getObservation: (id: string) => api.get<GraphNode>(`/nodes/observations/${id}`),
 

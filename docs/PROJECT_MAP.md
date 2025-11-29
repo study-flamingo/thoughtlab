@@ -13,12 +13,14 @@ This document maps the repository’s structure, major components, and the respo
   - [app/main.py](../backend/app/main.py): FastAPI app, CORS, lifespan startup/shutdown (connects to Neo4j/Redis), mounts routers, `/` and `/health`.
   - [app/core/config.py](../backend/app/core/config.py): Centralized environment config via pydantic-settings (`NEO4J_*`, `DATABASE_URL`, `REDIS_URL`, `SECRET_KEY`, etc.).
 - API routes
-  - [app/api/routes/nodes.py](../backend/app/api/routes/nodes.py): CRUD for `Observation`, `Source`, `Hypothesis`, `Entity`; relationship creation; generic `GET /nodes/{id}`; `GET /{id}/connections`.
+  - [app/api/routes/nodes.py](../backend/app/api/routes/nodes.py): CRUD for `Observation`, `Source`, `Hypothesis`, `Entity`; relationship CRUD; generic `GET /nodes/{id}`; `GET /{id}/connections`; `DELETE /nodes/{id}`.
   - [app/api/routes/graph.py](../backend/app/api/routes/graph.py): `GET /graph/full` for full graph visualization payload.
+  - [app/api/routes/settings.py](../backend/app/api/routes/settings.py): `GET /settings` and `PUT /settings` for app-wide settings (theme, layout, colors).
 - Services (domain logic)
-  - [app/services/graph_service.py](../backend/app/services/graph_service.py): All Neo4j Cypher logic; create/update/read nodes; create relationships; `get_node_connections`; `get_full_graph`; JSON-safe conversions.
+  - [app/services/graph_service.py](../backend/app/services/graph_service.py): All Neo4j Cypher logic; create/update/read/delete nodes; create/update/delete relationships; `get_node_connections`; `get_full_graph`; settings management; JSON-safe conversions.
 - Models (request/response DTOs, enums)
   - [app/models/nodes.py](../backend/app/models/nodes.py): Pydantic models for node types (`Observation`, `Hypothesis`, `Source`, `Concept`, `Entity`) and `RelationshipType`; `*Create`/`*Update`/`*Response` DTOs.
+  - [app/models/settings.py](../backend/app/models/settings.py): `AppSettings`, `AppSettingsUpdate`, `RelationStyle` models for application configuration.
 - Database connectors
   - [app/db/neo4j.py](../backend/app/db/neo4j.py): Async driver manager, `neo4j_conn.get_session()`.
   - [app/db/redis.py](../backend/app/db/redis.py): Async Redis client manager, `redis_conn.get_client()`.
@@ -43,22 +45,34 @@ This document maps the repository’s structure, major components, and the respo
   - `POST /api/v1/nodes/sources` → create Source
   - `POST /api/v1/nodes/hypotheses` / `PUT /api/v1/nodes/hypotheses/{id}` → create/update Hypothesis
   - `POST /api/v1/nodes/entities` / `PUT /api/v1/nodes/entities/{id}` → create/update Entity
-  - `POST /api/v1/nodes/relationships` → create relationship
   - `GET /api/v1/nodes/{id}/connections?max_depth=2` → connections around a node
   - `GET /api/v1/nodes/{id}` → generic node by id
+  - `DELETE /api/v1/nodes/{id}` → delete node and its relationships
+- Relationships
+  - `POST /api/v1/nodes/relationships` → create relationship
+  - `GET /api/v1/nodes/relationships/{id}` → get relationship by id
+  - `PUT /api/v1/nodes/relationships/{id}` → update relationship
+  - `DELETE /api/v1/nodes/relationships/{id}` → delete relationship
+- Settings
+  - `GET /api/v1/settings` → get app settings
+  - `PUT /api/v1/settings` → update app settings
 
 ## Frontend (React + Vite)
 - App bootstrap
   - [src/main.tsx](../frontend/src/main.tsx): React root; React Query provider with defaults.
-  - [src/App.tsx](../frontend/src/App.tsx): Layout shell; header (“Add Node”), main content (graph), sidebar (inspector/feed), modal wiring.
+  - [src/App.tsx](../frontend/src/App.tsx): Layout shell; header with actions (Settings, Add Relation, Add Node); main content (graph); sidebar (inspector/feed); modal wiring; selection state management for nodes and edges.
 - Components
-  - [components/GraphVisualizer.tsx](../frontend/src/components/GraphVisualizer.tsx): Fetches full graph; renders Cytoscape graph; node selection and highlight; fit/reset; legend.
-  - [components/NodeInspector.tsx](../frontend/src/components/NodeInspector.tsx): Loads a node by id; type-specific edit forms for Observation/Entity/Hypothesis; saves then invalidates caches.
-  - [components/CreateNodeModal.tsx](../frontend/src/components/CreateNodeModal.tsx): Create Observation/Entity (placeholders for Source/Hypothesis UI); invalidates graph and closes.
+  - [components/GraphVisualizer.tsx](../frontend/src/components/GraphVisualizer.tsx): Fetches full graph; renders Cytoscape graph; node/edge selection with highlighting; fit/reset controls; legend; dark mode support.
+  - [components/NodeInspector.tsx](../frontend/src/components/NodeInspector.tsx): Loads a node by id; type-specific edit forms for Observation/Entity/Hypothesis; delete functionality; invalidates caches on changes.
+  - [components/RelationInspector.tsx](../frontend/src/components/RelationInspector.tsx): Loads a relationship by id; displays source/target nodes, type, confidence, notes; edit and delete functionality.
+  - [components/CreateNodeModal.tsx](../frontend/src/components/CreateNodeModal.tsx): Tabbed modal for creating Observation/Source/Entity nodes; invalidates graph and closes.
+  - [components/CreateRelationModal.tsx](../frontend/src/components/CreateRelationModal.tsx): Modal for creating relationships between existing nodes; supports relationship type, confidence, notes, and inverse relationships.
+  - [components/SettingsModal.tsx](../frontend/src/components/SettingsModal.tsx): App settings configuration (theme, layout, edge labels, node colors, relation styles).
   - [components/ActivityFeed.tsx](../frontend/src/components/ActivityFeed.tsx): Placeholder UI for future real-time updates.
 - API client and types
-  - [services/api.ts](../frontend/src/services/api.ts): Axios client; endpoints for full graph, node CRUD/updates, relationships (suggestion endpoints are placeholders).
-  - [types/graph.ts](../frontend/src/types/graph.ts): TS types for nodes, edges, graph payloads, suggestions.
+  - [services/api.ts](../frontend/src/services/api.ts): Axios client; endpoints for full graph, node CRUD, relationship CRUD, settings.
+  - [types/graph.ts](../frontend/src/types/graph.ts): TS types for nodes, edges, graph payloads, relationship types.
+  - [types/settings.ts](../frontend/src/types/settings.ts): TS types for app settings, relation styles, theme options.
 - Config and tooling
   - [package.json](../frontend/package.json): Scripts, dependencies.
   - [index.html](../frontend/index.html), [src/index.css](../frontend/src/index.css), [tailwind.config.js](../frontend/tailwind.config.js)
@@ -68,6 +82,7 @@ This document maps the repository’s structure, major components, and the respo
   - [components/__tests__/ActivityFeed.test.tsx](../frontend/src/components/__tests__/ActivityFeed.test.tsx)
   - [components/__tests__/CreateNodeModal.test.tsx](../frontend/src/components/__tests__/CreateNodeModal.test.tsx)
   - [components/__tests__/GraphVisualizer.test.tsx](../frontend/src/components/__tests__/GraphVisualizer.test.tsx)
+  - [components/__tests__/SettingsModal.test.tsx](../frontend/src/components/__tests__/SettingsModal.test.tsx)
   - [services/__tests__/api.test.ts](../frontend/src/services/__tests__/api.test.ts)
   - Test setup: [src/test/setup.ts](../frontend/src/test/setup.ts)
 
@@ -98,8 +113,12 @@ This document maps the repository’s structure, major components, and the respo
 - Frontend
   - Graph view: `GraphVisualizer` → `graphApi.getFullGraph()` → `GET /api/v1/graph/full` → Neo4j via `graph_service.get_full_graph`.
   - Node details: `NodeInspector` → `graphApi.getNode(id)` → `GET /api/v1/nodes/{id}` → `graph_service.get_node`.
-  - Create node: `CreateNodeModal` → `graphApi.createObservation|createEntity` → `POST /api/v1/nodes/...` → service `create_*` → invalidate `['graph']`.
+  - Relationship details: `RelationInspector` → `graphApi.getRelationship(id)` → `GET /api/v1/nodes/relationships/{id}` → `graph_service.get_relationship`.
+  - Create node: `CreateNodeModal` → `graphApi.create*` → `POST /api/v1/nodes/...` → service `create_*` → invalidate `['graph']`.
+  - Create relationship: `CreateRelationModal` → `graphApi.createRelationship` → `POST /api/v1/nodes/relationships` → service `create_relationship` → invalidate `['graph']`.
   - Update node: `NodeInspector` → `graphApi.update*` → `PUT /api/v1/nodes/...` → service `update_*` → invalidate `['node', id]` and `['graph']`.
+  - Update relationship: `RelationInspector` → `graphApi.updateRelationship` → `PUT /api/v1/nodes/relationships/{id}` → invalidate `['relationship', id]` and `['graph']`.
+  - Selection: `App.tsx` manages `selectedNodeId` and `selectedEdgeId` state; `GraphVisualizer` emits selection events via callbacks; sidebar renders appropriate inspector based on selection.
 - Backend
   - Routes validate DTOs (Pydantic) → delegate to `graph_service` → Cypher via `neo4j_conn.get_session()` → JSON-safe responses (temporal types normalized).
 

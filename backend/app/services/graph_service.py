@@ -12,6 +12,9 @@ from app.models.nodes import (
     EntityCreate,
     EntityUpdate,
     EntityResponse,
+    ConceptCreate,
+    ConceptUpdate,
+    ConceptResponse,
     RelationshipCreate,
     RelationshipType,
 )
@@ -419,6 +422,92 @@ class GraphService:
         MATCH (e:Entity {{id: $id}})
         SET {', '.join(updates)}
         RETURN e.id as id
+        """
+        
+        async with neo4j_conn.get_session() as session:
+            result = await session.run(query, **params)
+            record = await result.single()
+            return record is not None
+    
+    async def create_concept(self, data: ConceptCreate) -> str:
+        """Create a concept node, return its ID"""
+        await self._ensure_neo4j()
+        node_id = str(uuid.uuid4())
+        now = datetime.now(UTC)
+        
+        # Build properties dict
+        props = {
+            "id": node_id,
+            "name": data.name,
+            "domain": data.domain,
+            "created_at": {
+                "year": now.year,
+                "month": now.month,
+                "day": now.day,
+                "hour": now.hour,
+                "minute": now.minute,
+                "second": now.second,
+            }
+        }
+        
+        # Build query with optional description
+        query_parts = [
+            "id: $id",
+            "name: $name",
+            "domain: $domain",
+            "created_at: datetime($created_at)"
+        ]
+        
+        if data.description:
+            query_parts.append("description: $description")
+            props["description"] = data.description
+        
+        query = f"""
+        CREATE (c:Concept {{
+            {', '.join(query_parts)}
+        }})
+        RETURN c.id as id
+        """
+        
+        async with neo4j_conn.get_session() as session:
+            result = await session.run(query, **props)
+            record = await result.single()
+            return record["id"]
+    
+    async def update_concept(self, node_id: str, data: ConceptUpdate) -> bool:
+        """Update a concept node"""
+        await self._ensure_neo4j()
+        now = datetime.now(UTC)
+        updates = []
+        params = {"id": node_id}
+        
+        if data.name is not None:
+            updates.append("c.name = $name")
+            params["name"] = data.name
+        if data.domain is not None:
+            updates.append("c.domain = $domain")
+            params["domain"] = data.domain
+        if data.description is not None:
+            updates.append("c.description = $description")
+            params["description"] = data.description
+        
+        if not updates:
+            return False
+        
+        updates.append("c.updated_at = datetime($updated_at)")
+        params["updated_at"] = {
+            "year": now.year,
+            "month": now.month,
+            "day": now.day,
+            "hour": now.hour,
+            "minute": now.minute,
+            "second": now.second,
+        }
+        
+        query = f"""
+        MATCH (c:Concept {{id: $id}})
+        SET {', '.join(updates)}
+        RETURN c.id as id
         """
         
         async with neo4j_conn.get_session() as session:

@@ -65,6 +65,12 @@ if ! "$VENV_PYTHON" -m uvicorn --help > /dev/null 2>&1; then
     exit 1
 fi
 
+# Clear Python bytecode cache to ensure fresh code is loaded
+# This fixes issues where uvicorn --reload doesn't detect changes on Windows
+echo "🧹 Clearing Python cache..."
+find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+find . -name "*.pyc" -delete 2>/dev/null || true
+
 # Check if port 8000 is already in use
 if command -v lsof > /dev/null 2>&1 && lsof -i :8000 > /dev/null 2>&1; then
     echo "⚠️  Port 8000 is already in use. Backend may already be running."
@@ -75,11 +81,13 @@ elif command -v ss > /dev/null 2>&1 && ss -tuln 2>/dev/null | grep -q ":8000"; t
 fi
 
 # Start backend (background; optionally detached)
+# Use --reload-dir to explicitly watch the app directory
+# Use watchfiles reloader which works better on Windows
 echo "Backend starting at http://localhost:8000"
 if [ $DETACHED -eq 1 ]; then
-    nohup "$VENV_PYTHON" -m uvicorn app.main:app --reload > /tmp/research-graph-backend.log 2>&1 &
+    nohup "$VENV_PYTHON" -m uvicorn app.main:app --reload --reload-dir app > /tmp/research-graph-backend.log 2>&1 &
 else
-    "$VENV_PYTHON" -m uvicorn app.main:app --reload > /tmp/research-graph-backend.log 2>&1 &
+    "$VENV_PYTHON" -m uvicorn app.main:app --reload --reload-dir app > /tmp/research-graph-backend.log 2>&1 &
 fi
 BACKEND_PID=$!
 echo $BACKEND_PID > "$RUN_DIR/backend.pid"

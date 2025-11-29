@@ -113,6 +113,25 @@ class EntityResponse(NodeBase):
     type: str = "Entity"
 
 
+class ConceptCreate(BaseModel):
+    name: str = Field(..., min_length=1, max_length=500)
+    description: Optional[str] = None
+    domain: str = Field(default="general")  # general, science, technology, etc.
+
+
+class ConceptUpdate(BaseModel):
+    name: Optional[str] = Field(None, min_length=1, max_length=500)
+    description: Optional[str] = None
+    domain: Optional[str] = None
+
+
+class ConceptResponse(NodeBase):
+    name: str
+    description: Optional[str] = None
+    domain: str
+    type: str = "Concept"
+
+
 class RelationshipCreate(BaseModel):
     from_id: str
     to_id: str

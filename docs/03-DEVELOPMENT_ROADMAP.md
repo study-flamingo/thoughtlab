@@ -4,6 +4,30 @@ This document outlines the step-by-step development plan for the Research Connec
 
 ---
 
+## Development Principles
+
+Before diving into implementation, keep these core principles in mind throughout development:
+
+### Modularity First
+Design every feature with **modularity** in mind to facilitate easy expansion as the project grows, with minimal refactoring necessary. This means:
+
+- **Single Responsibility**: Each module/component does one thing well
+- **Clear Interfaces**: Use Pydantic models (backend) and TypeScript types (frontend) as contracts
+- **Separation of Concerns**: Routes handle HTTP, services handle business logic, connectors handle data access
+- **Minimal Coupling**: Components communicate via props/callbacks, not global state
+- **Easy Extension Points**: New node types, relationship types, and features should require isolated changes
+
+See [ADR-012: Development Principles](./02-ARCHITECTURE_DECISIONS.md#adr-012-development-principles---modularity-and-extensibility) for detailed guidelines and examples.
+
+### Quality Standards
+- Write tests for new features (pytest for backend, vitest for frontend)
+- Use type hints in Python and TypeScript throughout
+- Keep functions small and focused
+- Document non-obvious decisions in code comments
+- Follow existing patterns in the codebase
+
+---
+
 ## Phase 0: Environment Setup (Days 1-2)
 
 **Objective:** Get all development tools and services running locally.
