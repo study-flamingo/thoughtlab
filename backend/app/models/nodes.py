@@ -22,11 +22,18 @@ class RelationshipType(str, Enum):
     DERIVED_FROM = "DERIVED_FROM"
 
 
+class LinkItem(BaseModel):
+    """A clickable link with optional label"""
+    url: str = Field(..., min_length=1)
+    label: Optional[str] = Field(None, max_length=200)
+
+
 class NodeBase(BaseModel):
     """Base properties for all nodes"""
     id: Optional[str] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
+    links: Optional[List[LinkItem]] = None
 
 
 class ObservationCreate(BaseModel):
@@ -34,12 +41,14 @@ class ObservationCreate(BaseModel):
     confidence: float = Field(default=0.8, ge=0.0, le=1.0)
     subject_ids: Optional[List[str]] = None
     concept_names: Optional[List[str]] = None
+    links: Optional[List[LinkItem]] = None
 
 
 class ObservationUpdate(BaseModel):
     text: Optional[str] = Field(None, min_length=1, max_length=10000)
     confidence: Optional[float] = Field(None, ge=0.0, le=1.0)
     concept_names: Optional[List[str]] = None
+    links: Optional[List[LinkItem]] = None
 
 
 class ObservationResponse(NodeBase):
@@ -51,10 +60,11 @@ class ObservationResponse(NodeBase):
 
 class SourceCreate(BaseModel):
     title: str = Field(..., min_length=1, max_length=500)
-    url: Optional[str] = None
+    url: Optional[str] = None  # Primary URL for the source
     source_type: str = Field(default="paper")  # paper, forum, article, etc.
     content: Optional[str] = None
     published_date: Optional[datetime] = None
+    links: Optional[List[LinkItem]] = None  # Additional related links
 
 
 class SourceUpdate(BaseModel):
@@ -63,6 +73,7 @@ class SourceUpdate(BaseModel):
     source_type: Optional[str] = None
     content: Optional[str] = None
     published_date: Optional[datetime] = None
+    links: Optional[List[LinkItem]] = None
 
 
 class SourceResponse(NodeBase):
@@ -75,17 +86,22 @@ class SourceResponse(NodeBase):
 
 
 class HypothesisCreate(BaseModel):
-    claim: str = Field(..., min_length=1, max_length=10000)
+    name: str = Field(..., min_length=1, max_length=200)  # Short display name for the graph
+    claim: str = Field(..., min_length=1, max_length=10000)  # Full hypothesis statement
     supporting_evidence_ids: Optional[List[str]] = None
     status: str = Field(default="proposed")  # proposed, tested, confirmed, rejected
+    links: Optional[List[LinkItem]] = None
 
 
 class HypothesisUpdate(BaseModel):
+    name: Optional[str] = Field(None, min_length=1, max_length=200)
     claim: Optional[str] = Field(None, min_length=1, max_length=10000)
     status: Optional[str] = None
+    links: Optional[List[LinkItem]] = None
 
 
 class HypothesisResponse(NodeBase):
+    name: str
     claim: str
     status: str
     type: str = "Hypothesis"
@@ -96,6 +112,7 @@ class EntityCreate(BaseModel):
     entity_type: str = Field(default="generic")  # person, organization, location, concept, etc.
     description: Optional[str] = None
     properties: Optional[Dict[str, Any]] = None
+    links: Optional[List[LinkItem]] = None
 
 
 class EntityUpdate(BaseModel):
@@ -103,6 +120,7 @@ class EntityUpdate(BaseModel):
     entity_type: Optional[str] = None
     description: Optional[str] = None
     properties: Optional[Dict[str, Any]] = None
+    links: Optional[List[LinkItem]] = None
 
 
 class EntityResponse(NodeBase):
@@ -111,6 +129,27 @@ class EntityResponse(NodeBase):
     description: Optional[str] = None
     properties: Optional[Dict[str, Any]] = None
     type: str = "Entity"
+
+
+class ConceptCreate(BaseModel):
+    name: str = Field(..., min_length=1, max_length=500)
+    description: Optional[str] = None
+    domain: str = Field(default="general")  # general, science, technology, etc.
+    links: Optional[List[LinkItem]] = None
+
+
+class ConceptUpdate(BaseModel):
+    name: Optional[str] = Field(None, min_length=1, max_length=500)
+    description: Optional[str] = None
+    domain: Optional[str] = None
+    links: Optional[List[LinkItem]] = None
+
+
+class ConceptResponse(NodeBase):
+    name: str
+    description: Optional[str] = None
+    domain: str
+    type: str = "Concept"
 
 
 class RelationshipCreate(BaseModel):

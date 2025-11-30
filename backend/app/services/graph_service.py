@@ -12,14 +12,36 @@ from app.models.nodes import (
     EntityCreate,
     EntityUpdate,
     EntityResponse,
+    ConceptCreate,
+    ConceptUpdate,
+    ConceptResponse,
     RelationshipCreate,
     RelationshipType,
+    LinkItem,
 )
 from app.models.settings import AppSettings, AppSettingsUpdate
 from datetime import datetime, UTC
 from neo4j.time import DateTime as Neo4jDateTime, Date as Neo4jDate, Time as Neo4jTime
 import uuid
 from typing import List, Optional, Dict, Any
+import json
+
+
+def _serialize_links(links: Optional[List[LinkItem]]) -> Optional[str]:
+    """Serialize links to JSON string for Neo4j storage"""
+    if links is None:
+        return None
+    return json.dumps([link.model_dump() for link in links])
+
+
+def _deserialize_links(links_json: Optional[str]) -> Optional[List[Dict[str, Any]]]:
+    """Deserialize links from JSON string"""
+    if links_json is None:
+        return None
+    try:
+        return json.loads(links_json)
+    except (json.JSONDecodeError, TypeError):
+        return None
 
 
 class GraphService:
@@ -31,7 +53,7 @@ class GraphService:
             await neo4j_conn.connect()
     
     @staticmethod
-    def _json_safe(value: Any) -> Any:
+    def _json_safe(value: Any, key: str = "") -> Any:
         """Convert values (including Neo4j temporal types) to JSON-safe primitives."""
         if isinstance(value, datetime):
             return value.isoformat()
@@ -45,8 +67,11 @@ class GraphService:
                 # Fallback to string representation
                 return str(value)
             return str(value)
+        # Deserialize links from JSON string
+        if key == "links" and isinstance(value, str):
+            return _deserialize_links(value)
         if isinstance(value, dict):
-            return {k: GraphService._json_safe(v) for k, v in value.items()}
+            return {k: GraphService._json_safe(v, k) for k, v in value.items()}
         if isinstance(value, list):
             return [GraphService._json_safe(v) for v in value]
         return value
@@ -63,7 +88,8 @@ class GraphService:
             text: $text,
             confidence: $confidence,
             created_at: datetime($created_at),
-            concept_names: $concepts
+            concept_names: $concepts,
+            links: $links
         })
         RETURN o.id as id
         """
@@ -82,7 +108,8 @@ class GraphService:
                     "minute": now.minute,
                     "second": now.second,
                 },
-                concepts=data.concept_names or []
+                concepts=data.concept_names or [],
+                links=_serialize_links(data.links)
             )
             record = await result.single()
             return record["id"]
@@ -99,7 +126,7 @@ class GraphService:
             result = await session.run(query, id=node_id)
             record = await result.single()
             if record:
-                node_data = {k: GraphService._json_safe(v) for k, v in dict(record["o"]).items()}
+                node_data = {k: GraphService._json_safe(v, k) for k, v in dict(record["o"]).items()}
                 node_data["type"] = "Observation"
                 return node_data
             return None
@@ -118,7 +145,7 @@ class GraphService:
             result = await session.run(query, limit=limit)
             nodes = []
             async for record in result:
-                node_data = {k: GraphService._json_safe(v) for k, v in dict(record["o"]).items()}
+                node_data = {k: GraphService._json_safe(v, k) for k, v in dict(record["o"]).items()}
                 node_data["type"] = "Observation"
                 nodes.append(node_data)
             return nodes
@@ -139,6 +166,9 @@ class GraphService:
         if data.concept_names is not None:
             updates.append("o.concept_names = $concepts")
             params["concepts"] = data.concept_names
+        if data.links is not None:
+            updates.append("o.links = $links")
+            params["links"] = _serialize_links(data.links)
         
         if not updates:
             return False
@@ -178,7 +208,8 @@ class GraphService:
             source_type: $source_type,
             content: $content,
             published_date: $published_date,
-            created_at: datetime($created_at)
+            created_at: datetime($created_at),
+            links: $links
         })
         RETURN s.id as id
         """
@@ -207,7 +238,8 @@ class GraphService:
                     "hour": now.hour,
                     "minute": now.minute,
                     "second": now.second,
-                }
+                },
+                links=_serialize_links(data.links)
             )
             record = await result.single()
             return record["id"]
@@ -238,6 +270,9 @@ class GraphService:
                 "month": data.published_date.month,
                 "day": data.published_date.day,
             }
+        if data.links is not None:
+            updates.append("s.links = $links")
+            params["links"] = _serialize_links(data.links)
         
         if not updates:
             return False
@@ -272,9 +307,11 @@ class GraphService:
         query = """
         CREATE (h:Hypothesis {
             id: $id,
+            name: $name,
             claim: $claim,
             status: $status,
-            created_at: datetime($created_at)
+            created_at: datetime($created_at),
+            links: $links
         })
         RETURN h.id as id
         """
@@ -283,6 +320,7 @@ class GraphService:
             result = await session.run(
                 query,
                 id=node_id,
+                name=data.name,
                 claim=data.claim,
                 status=data.status,
                 created_at={
@@ -292,7 +330,8 @@ class GraphService:
                     "hour": now.hour,
                     "minute": now.minute,
                     "second": now.second,
-                }
+                },
+                links=_serialize_links(data.links)
             )
             record = await result.single()
             return record["id"]
@@ -304,12 +343,18 @@ class GraphService:
         updates = []
         params = {"id": node_id}
         
+        if data.name is not None:
+            updates.append("h.name = $name")
+            params["name"] = data.name
         if data.claim is not None:
             updates.append("h.claim = $claim")
             params["claim"] = data.claim
         if data.status is not None:
             updates.append("h.status = $status")
             params["status"] = data.status
+        if data.links is not None:
+            updates.append("h.links = $links")
+            params["links"] = _serialize_links(data.links)
         
         if not updates:
             return False
@@ -353,7 +398,8 @@ class GraphService:
                 "hour": now.hour,
                 "minute": now.minute,
                 "second": now.second,
-            }
+            },
+            "links": _serialize_links(data.links)
         }
         
         # Build query with optional description
@@ -361,7 +407,8 @@ class GraphService:
             "id: $id",
             "name: $name",
             "entity_type: $entity_type",
-            "created_at: datetime($created_at)"
+            "created_at: datetime($created_at)",
+            "links: $links"
         ]
         
         if data.description:
@@ -400,6 +447,9 @@ class GraphService:
             # Merge with existing properties
             updates.append("e.properties = COALESCE(e.properties, {{}}) + $properties")
             params["properties"] = data.properties
+        if data.links is not None:
+            updates.append("e.links = $links")
+            params["links"] = _serialize_links(data.links)
         
         if not updates:
             return False
@@ -425,6 +475,97 @@ class GraphService:
             record = await result.single()
             return record is not None
     
+    async def create_concept(self, data: ConceptCreate) -> str:
+        """Create a concept node, return its ID"""
+        await self._ensure_neo4j()
+        node_id = str(uuid.uuid4())
+        now = datetime.now(UTC)
+        
+        # Build properties dict
+        props = {
+            "id": node_id,
+            "name": data.name,
+            "domain": data.domain,
+            "created_at": {
+                "year": now.year,
+                "month": now.month,
+                "day": now.day,
+                "hour": now.hour,
+                "minute": now.minute,
+                "second": now.second,
+            },
+            "links": _serialize_links(data.links)
+        }
+        
+        # Build query with optional description
+        query_parts = [
+            "id: $id",
+            "name: $name",
+            "domain: $domain",
+            "created_at: datetime($created_at)",
+            "links: $links"
+        ]
+        
+        if data.description:
+            query_parts.append("description: $description")
+            props["description"] = data.description
+        
+        query = f"""
+        CREATE (c:Concept {{
+            {', '.join(query_parts)}
+        }})
+        RETURN c.id as id
+        """
+        
+        async with neo4j_conn.get_session() as session:
+            result = await session.run(query, **props)
+            record = await result.single()
+            return record["id"]
+    
+    async def update_concept(self, node_id: str, data: ConceptUpdate) -> bool:
+        """Update a concept node"""
+        await self._ensure_neo4j()
+        now = datetime.now(UTC)
+        updates = []
+        params = {"id": node_id}
+        
+        if data.name is not None:
+            updates.append("c.name = $name")
+            params["name"] = data.name
+        if data.domain is not None:
+            updates.append("c.domain = $domain")
+            params["domain"] = data.domain
+        if data.description is not None:
+            updates.append("c.description = $description")
+            params["description"] = data.description
+        if data.links is not None:
+            updates.append("c.links = $links")
+            params["links"] = _serialize_links(data.links)
+        
+        if not updates:
+            return False
+        
+        updates.append("c.updated_at = datetime($updated_at)")
+        params["updated_at"] = {
+            "year": now.year,
+            "month": now.month,
+            "day": now.day,
+            "hour": now.hour,
+            "minute": now.minute,
+            "second": now.second,
+        }
+        
+        query = f"""
+        MATCH (c:Concept {{id: $id}})
+        SET {', '.join(updates)}
+        RETURN c.id as id
+        """
+        
+        async with neo4j_conn.get_session() as session:
+            result = await session.run(query, **params)
+            record = await result.single()
+            return record is not None
+    
     async def get_node(self, node_id: str) -> Optional[Dict[str, Any]]:
         """Get any node by ID, regardless of type"""
         await self._ensure_neo4j()
@@ -439,7 +580,7 @@ class GraphService:
             record = await result.single()
             if record:
                 labels = record["labels"]
-                node_data = {k: GraphService._json_safe(v) for k, v in dict(record["n"]).items()}
+                node_data = {k: GraphService._json_safe(v, k) for k, v in dict(record["n"]).items()}
                 # Set type from first label
                 if labels:
                     node_data["type"] = labels[0]
@@ -609,7 +750,7 @@ class GraphService:
             seen_ids = set()
             
             async for record in result:
-                node_data = {k: GraphService._json_safe(v) for k, v in dict(record["connected"]).items()}
+                node_data = {k: GraphService._json_safe(v, k) for k, v in dict(record["connected"]).items()}
                 
                 connected_id = node_data.get("id")
                 
@@ -649,7 +790,7 @@ class GraphService:
             nodes_result = await session.run(nodes_query, limit=limit)
             nodes = []
             async for record in nodes_result:
-                node_data = {k: GraphService._json_safe(v) for k, v in dict(record["n"]).items()}
+                node_data = {k: GraphService._json_safe(v, k) for k, v in dict(record["n"]).items()}
                 node_labels = list(record["labels"])
                 node_data["type"] = node_labels[0] if node_labels else "Unknown"
                 nodes.append(node_data)
@@ -698,6 +839,25 @@ class GraphService:
             record = await result.single()
             node = dict(record["s"])
             # Normalize into AppSettings
+            # Decode JSON-encoded complex settings if present
+            raw_node_colors = node.get("node_colors", None)
+            if isinstance(raw_node_colors, str):
+                try:
+                    decoded_node_colors = json.loads(raw_node_colors)
+                except Exception:
+                    decoded_node_colors = None
+            else:
+                decoded_node_colors = None
+
+            raw_relation_styles = node.get("relation_styles", None)
+            if isinstance(raw_relation_styles, str):
+                try:
+                    decoded_relation_styles = json.loads(raw_relation_styles)
+                except Exception:
+                    decoded_relation_styles = None
+            else:
+                decoded_relation_styles = None
+
             settings = AppSettings(
                 id=node.get("id", "app"),
                 theme=node.get("theme", "light"),
@@ -705,6 +865,8 @@ class GraphService:
                 default_relation_confidence=float(node.get("default_relation_confidence", 0.8)),
                 layout_name=node.get("layout_name", "cose"),
                 animate_layout=bool(node.get("animate_layout", False)),
+                node_colors=decoded_node_colors or AppSettings().node_colors,
+                relation_styles=decoded_relation_styles or AppSettings().relation_styles,
             )
             return settings.model_dump()
 
@@ -722,6 +884,22 @@ class GraphService:
             updates["layout_name"] = update.layout_name
         if update.animate_layout is not None:
             updates["animate_layout"] = update.animate_layout
+        if update.node_colors is not None:
+            # Store as JSON string to comply with Neo4j property constraints
+            try:
+                updates["node_colors"] = json.dumps(update.node_colors)
+            except Exception:
+                # Fallback to empty dict JSON
+                updates["node_colors"] = json.dumps({})
+        if update.relation_styles is not None:
+            # Convert RelationStyle models to dicts, then JSON-encode
+            try:
+                relation_styles_dict = {
+                    k: (v.model_dump() if hasattr(v, "model_dump") else v) for k, v in update.relation_styles.items()
+                }
+                updates["relation_styles"] = json.dumps(relation_styles_dict)
+            except Exception:
+                updates["relation_styles"] = json.dumps({})
 
         if not updates:
             # No-op; just return current settings
@@ -743,6 +921,25 @@ class GraphService:
             result = await session.run(query, **params)
             record = await result.single()
             node = dict(record["s"])
+            # Decode JSON-encoded complex settings if present
+            raw_node_colors = node.get("node_colors", None)
+            if isinstance(raw_node_colors, str):
+                try:
+                    decoded_node_colors = json.loads(raw_node_colors)
+                except Exception:
+                    decoded_node_colors = None
+            else:
+                decoded_node_colors = None
+
+            raw_relation_styles = node.get("relation_styles", None)
+            if isinstance(raw_relation_styles, str):
+                try:
+                    decoded_relation_styles = json.loads(raw_relation_styles)
+                except Exception:
+                    decoded_relation_styles = None
+            else:
+                decoded_relation_styles = None
+
             settings = AppSettings(
                 id=node.get("id", "app"),
                 theme=node.get("theme", "light"),
@@ -750,6 +947,8 @@ class GraphService:
                 default_relation_confidence=float(node.get("default_relation_confidence", 0.8)),
                 layout_name=node.get("layout_name", "cose"),
                 animate_layout=bool(node.get("animate_layout", False)),
+                node_colors=decoded_node_colors or AppSettings().node_colors,
+                relation_styles=decoded_relation_styles or AppSettings().relation_styles,
             )
             return settings.model_dump()
 

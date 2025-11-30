@@ -1,0 +1,65 @@
+# Gitleaks configuration
+# https://github.com/gitleaks/gitleaks
+
+title = "ThoughtLab Gitleaks Config"
+
+# Allow development/example passwords that are intentionally in the codebase
+[allowlist]
+  description = "Allowed patterns for development"
+  
+  # Development Neo4j password used in docker-compose and setup scripts
+  regexTarget = "match"
+  regexes = [
+    '''research_graph_password''',
+    '''change-me-in-production''',
+  ]
+  
+  # Allow example/template files
+  paths = [
+    '''\.env\.example$''',
+    '''\.gitleaks\.toml$''',
+  ]
+
+# Extend default rules - these are the patterns we want to catch
+[[rules]]
+  id = "generic-api-key"
+  description = "Generic API Key"
+  regex = '''(?i)(api[_-]?key|apikey)\s*[:=]\s*['"]?([a-zA-Z0-9_\-]{20,})['"]?'''
+  secretGroup = 2
+
+[[rules]]
+  id = "aws-access-key"
+  description = "AWS Access Key ID"
+  regex = '''AKIA[0-9A-Z]{16}'''
+
+[[rules]]
+  id = "aws-secret-key"
+  description = "AWS Secret Access Key"
+  regex = '''(?i)aws_secret_access_key\s*[:=]\s*['"]?([A-Za-z0-9/+=]{40})['"]?'''
+  secretGroup = 1
+
+[[rules]]
+  id = "openai-api-key"
+  description = "OpenAI API Key"
+  regex = '''sk-[a-zA-Z0-9]{20,}'''
+
+[[rules]]
+  id = "anthropic-api-key"
+  description = "Anthropic API Key"
+  regex = '''sk-ant-[a-zA-Z0-9\-_]{20,}'''
+
+[[rules]]
+  id = "github-token"
+  description = "GitHub Token"
+  regex = '''gh[pousr]_[A-Za-z0-9_]{36,}'''
+
+[[rules]]
+  id = "private-key"
+  description = "Private Key"
+  regex = '''-----BEGIN (?:RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----'''
+
+[[rules]]
+  id = "jwt-token"
+  description = "JWT Token"
+  regex = '''eyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}'''
+

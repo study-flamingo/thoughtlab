@@ -12,6 +12,9 @@ from app.models.nodes import (
     EntityCreate,
     EntityUpdate,
     EntityResponse,
+    ConceptCreate,
+    ConceptUpdate,
+    ConceptResponse,
     RelationshipCreate,
     RelationshipUpdate,
     RelationshipResponse,
@@ -63,6 +66,15 @@ async def create_source(data: SourceCreate):
     return {"id": node_id, "message": "Source created"}
 
 
+@router.put("/sources/{node_id}", response_model=dict)
+async def update_source(node_id: str, data: SourceUpdate):
+    """Update a source node"""
+    success = await graph_service.update_source(node_id, data)
+    if not success:
+        raise HTTPException(status_code=404, detail="Source not found or no changes provided")
+    return {"id": node_id, "message": "Source updated"}
+
+
 @router.put("/hypotheses/{node_id}", response_model=dict)
 async def update_hypothesis(node_id: str, data: HypothesisUpdate):
     """Update a hypothesis node"""
@@ -93,6 +105,22 @@ async def create_entity(data: EntityCreate):
     """Create a new entity node"""
     node_id = await graph_service.create_entity(data)
     return {"id": node_id, "message": "Entity created"}
+
+
+@router.post("/concepts", response_model=dict)
+async def create_concept(data: ConceptCreate):
+    """Create a new concept node"""
+    node_id = await graph_service.create_concept(data)
+    return {"id": node_id, "message": "Concept created"}
+
+
+@router.put("/concepts/{node_id}", response_model=dict)
+async def update_concept(node_id: str, data: ConceptUpdate):
+    """Update a concept node"""
+    success = await graph_service.update_concept(node_id, data)
+    if not success:
+        raise HTTPException(status_code=404, detail="Concept not found or no changes provided")
+    return {"id": node_id, "message": "Concept updated"}
 
 
 @router.post("/relationships", response_model=dict)

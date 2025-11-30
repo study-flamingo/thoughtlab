@@ -60,17 +60,10 @@ if ($missingDeps.Count -gt 0) {
     exit 1
 }
 
-Write-Host ""
-Write-Host "🐳 Starting Docker services..." -ForegroundColor Yellow
-
+# Change to project root
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $projectRoot = Split-Path -Parent $scriptDir
 Set-Location $projectRoot
-
-docker-compose up -d
-
-Write-Host "⏳ Waiting for services to start..." -ForegroundColor Yellow
-Start-Sleep -Seconds 10
 
 Write-Host ""
 Write-Host "🐍 Setting up backend..." -ForegroundColor Yellow
@@ -142,6 +135,18 @@ if (-not (Test-Path ".env")) {
 }
 
 Set-Location ..
+
+Write-Host ""
+Write-Host "🐳 Starting Docker services..." -ForegroundColor Yellow
+
+# Start Docker services if not running
+$dockerStatus = docker-compose ps 2>$null
+if ($dockerStatus -notmatch "Up") {
+    docker-compose up -d
+    Write-Host "⏳ Waiting for services to start..." -ForegroundColor Yellow
+} else {
+    Write-Host "✓ Docker services already running" -ForegroundColor Green
+}
 
 Write-Host ""
 Write-Host "🗄️  Initializing Neo4j..." -ForegroundColor Yellow

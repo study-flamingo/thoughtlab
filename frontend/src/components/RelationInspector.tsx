@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { graphApi } from '../services/api';
-import type { RelationshipResponse, RelationshipType } from '../types/graph';
+import type { RelationshipType } from '../types/graph';
 
 interface Props {
   relationshipId: string | null;
@@ -21,26 +21,14 @@ export default function RelationInspector({ relationshipId, onClose }: Props) {
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState<any>({});
 
-  // Debug logging
-  useEffect(() => {
-    console.log('RelationInspector: relationshipId prop:', relationshipId);
-  }, [relationshipId]);
-
-  const { data: relationship, isLoading, error } = useQuery({
+  const { data: relationship, isLoading } = useQuery({
     queryKey: ['relationship', relationshipId],
     queryFn: async () => {
-      console.log('RelationInspector: Fetching relationship with ID:', relationshipId);
       const response = await graphApi.getRelationship(relationshipId!);
-      console.log('RelationInspector: Received relationship data:', response.data);
       return response.data;
     },
     enabled: !!relationshipId,
   });
-
-  // Debug logging for query state
-  useEffect(() => {
-    console.log('RelationInspector: isLoading:', isLoading, 'error:', error, 'relationship:', relationship);
-  }, [isLoading, error, relationship]);
 
   // Fetch source and target nodes for display
   const { data: sourceNode } = useQuery({
@@ -109,11 +97,11 @@ export default function RelationInspector({ relationshipId, onClose }: Props) {
   if (!relationshipId) {
     return (
       <div className="h-full flex flex-col">
-        <div className="p-4 border-b">
-          <h2 className="font-semibold text-gray-800">Relation Inspector</h2>
+        <div className="p-4 border-b dark:border-gray-700">
+          <h2 className="font-semibold text-gray-800 dark:text-gray-100">Relation Inspector</h2>
         </div>
         <div className="flex-1 flex items-center justify-center p-4">
-          <p className="text-sm text-gray-500">Select a relation to view details</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400">Select a relation to view details</p>
         </div>
       </div>
     );
@@ -122,8 +110,8 @@ export default function RelationInspector({ relationshipId, onClose }: Props) {
   if (isLoading) {
     return (
       <div className="h-full flex flex-col">
-        <div className="p-4 border-b">
-          <h2 className="font-semibold text-gray-800">Relation Inspector</h2>
+        <div className="p-4 border-b dark:border-gray-700">
+          <h2 className="font-semibold text-gray-800 dark:text-gray-100">Relation Inspector</h2>
         </div>
         <div className="flex-1 flex items-center justify-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
@@ -135,8 +123,8 @@ export default function RelationInspector({ relationshipId, onClose }: Props) {
   if (!relationship) {
     return (
       <div className="h-full flex flex-col">
-        <div className="p-4 border-b">
-          <h2 className="font-semibold text-gray-800">Relation Inspector</h2>
+        <div className="p-4 border-b dark:border-gray-700">
+          <h2 className="font-semibold text-gray-800 dark:text-gray-100">Relation Inspector</h2>
         </div>
         <div className="flex-1 flex items-center justify-center p-4">
           <p className="text-sm text-red-500">Relation not found</p>
@@ -159,11 +147,11 @@ export default function RelationInspector({ relationshipId, onClose }: Props) {
   return (
     <div className="h-full flex flex-col">
       {/* Header */}
-      <div className="p-4 border-b flex justify-between items-center">
-        <h2 className="font-semibold text-gray-800">Relation Inspector</h2>
+      <div className="p-4 border-b dark:border-gray-700 flex justify-between items-center">
+        <h2 className="font-semibold text-gray-800 dark:text-gray-100">Relation Inspector</h2>
         <button
           onClick={onClose}
-          className="text-gray-400 hover:text-gray-600 text-xl leading-none"
+          className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-xl leading-none"
         >
           ×
         </button>
@@ -173,34 +161,34 @@ export default function RelationInspector({ relationshipId, onClose }: Props) {
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {/* Relationship ID */}
         <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1">ID</label>
-          <p className="text-sm font-mono text-gray-700 break-all">{relationship.id}</p>
+          <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">ID</label>
+          <p className="text-sm font-mono text-gray-700 dark:text-gray-300 break-all">{relationship.id}</p>
         </div>
 
         {/* Direction: Forward */}
-        <div className="pt-2 border-t">
-          <h3 className="text-sm font-semibold text-gray-700 mb-3">Forward Direction</h3>
+        <div className="pt-2 border-t dark:border-gray-700">
+          <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Forward Direction</h3>
           
           {/* Source Node */}
           <div className="mb-3">
-            <label className="block text-xs font-medium text-gray-500 mb-1">From</label>
-            <div className="text-sm text-gray-700">
-              <span className="inline-block px-2 py-1 text-xs font-medium rounded bg-gray-100 text-gray-800 mr-2">
+            <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">From</label>
+            <div className="text-sm text-gray-700 dark:text-gray-300">
+              <span className="inline-block px-2 py-1 text-xs font-medium rounded bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 mr-2">
                 {sourceNode?.type || 'Unknown'}
               </span>
-              <span className="font-mono text-xs text-gray-500">{relationship.from_id.substring(0, 8)}...</span>
-              <p className="mt-1 text-gray-600">{getNodeDisplayText(sourceNode)}</p>
+              <span className="font-mono text-xs text-gray-500 dark:text-gray-400">{relationship.from_id.substring(0, 8)}...</span>
+              <p className="mt-1 text-gray-600 dark:text-gray-400">{getNodeDisplayText(sourceNode)}</p>
             </div>
           </div>
 
           {/* Relationship Type */}
           <div className="mb-3">
-            <label className="block text-xs font-medium text-gray-700 mb-1">Type</label>
+            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Type</label>
             {isEditing ? (
               <select
                 value={formData.relationship_type}
                 onChange={(e) => setFormData({ ...formData, relationship_type: e.target.value })}
-                className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full border dark:border-gray-600 rounded-md px-3 py-2 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 {RELATIONSHIP_TYPES.map((type) => (
                   <option key={type} value={type}>
@@ -209,13 +197,13 @@ export default function RelationInspector({ relationshipId, onClose }: Props) {
                 ))}
               </select>
             ) : (
-              <p className="text-sm text-gray-700 font-medium">{relationship.type}</p>
+              <p className="text-sm text-gray-700 dark:text-gray-300 font-medium">{relationship.type}</p>
             )}
           </div>
 
           {/* Confidence */}
           <div className="mb-3">
-            <label className="block text-xs font-medium text-gray-700 mb-1">
+            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
               Confidence: {isEditing ? `${(formData.confidence * 100).toFixed(0)}%` : `${((relationship.confidence || 0) * 100).toFixed(0)}%`}
             </label>
             {isEditing ? (
@@ -226,10 +214,10 @@ export default function RelationInspector({ relationshipId, onClose }: Props) {
                 step="0.05"
                 value={formData.confidence}
                 onChange={(e) => setFormData({ ...formData, confidence: parseFloat(e.target.value) })}
-                className="w-full"
+                className="w-full accent-blue-600"
               />
             ) : (
-              <div className="w-full bg-gray-200 rounded-full h-2">
+              <div className="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-2">
                 <div
                   className="bg-blue-600 h-2 rounded-full"
                   style={{ width: `${((relationship.confidence || 0) * 100)}%` }}
@@ -240,17 +228,17 @@ export default function RelationInspector({ relationshipId, onClose }: Props) {
 
           {/* Notes */}
           <div className="mb-3">
-            <label className="block text-xs font-medium text-gray-700 mb-1">Notes</label>
+            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Notes</label>
             {isEditing ? (
               <textarea
                 value={formData.notes}
                 onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full border dark:border-gray-600 rounded-md px-3 py-2 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 rows={3}
                 placeholder="Add notes about this relationship..."
               />
             ) : (
-              <p className="text-sm text-gray-700 whitespace-pre-wrap">
+              <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
                 {relationship.notes || '-'}
               </p>
             )}
@@ -258,29 +246,29 @@ export default function RelationInspector({ relationshipId, onClose }: Props) {
 
           {/* Target Node */}
           <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">To</label>
-            <div className="text-sm text-gray-700">
-              <span className="inline-block px-2 py-1 text-xs font-medium rounded bg-gray-100 text-gray-800 mr-2">
+            <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">To</label>
+            <div className="text-sm text-gray-700 dark:text-gray-300">
+              <span className="inline-block px-2 py-1 text-xs font-medium rounded bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 mr-2">
                 {targetNode?.type || 'Unknown'}
               </span>
-              <span className="font-mono text-xs text-gray-500">{relationship.to_id.substring(0, 8)}...</span>
-              <p className="mt-1 text-gray-600">{getNodeDisplayText(targetNode)}</p>
+              <span className="font-mono text-xs text-gray-500 dark:text-gray-400">{relationship.to_id.substring(0, 8)}...</span>
+              <p className="mt-1 text-gray-600 dark:text-gray-400">{getNodeDisplayText(targetNode)}</p>
             </div>
           </div>
         </div>
 
         {/* Direction: Inverse */}
-        <div className="pt-4 border-t">
-          <h3 className="text-sm font-semibold text-gray-700 mb-3">Inverse Direction</h3>
+        <div className="pt-4 border-t dark:border-gray-700">
+          <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Inverse Direction</h3>
           
           {/* Inverse Relationship Type */}
           <div className="mb-3">
-            <label className="block text-xs font-medium text-gray-700 mb-1">Inverse Type</label>
+            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Inverse Type</label>
             {isEditing ? (
               <select
                 value={formData.inverse_relationship_type}
                 onChange={(e) => setFormData({ ...formData, inverse_relationship_type: e.target.value })}
-                className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full border dark:border-gray-600 rounded-md px-3 py-2 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="">None</option>
                 {RELATIONSHIP_TYPES.map((type) => (
@@ -290,7 +278,7 @@ export default function RelationInspector({ relationshipId, onClose }: Props) {
                 ))}
               </select>
             ) : (
-              <p className="text-sm text-gray-700">
+              <p className="text-sm text-gray-700 dark:text-gray-300">
                 {relationship.inverse_relationship_type || '-'}
               </p>
             )}
@@ -299,7 +287,7 @@ export default function RelationInspector({ relationshipId, onClose }: Props) {
           {/* Inverse Confidence */}
           {(relationship.inverse_relationship_type || (isEditing && formData.inverse_relationship_type)) && (
             <div className="mb-3">
-              <label className="block text-xs font-medium text-gray-700 mb-1">
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Inverse Confidence: {isEditing ? `${(formData.inverse_confidence * 100).toFixed(0)}%` : `${((relationship.inverse_confidence || 0) * 100).toFixed(0)}%`}
               </label>
               {isEditing ? (
@@ -310,10 +298,10 @@ export default function RelationInspector({ relationshipId, onClose }: Props) {
                   step="0.05"
                   value={formData.inverse_confidence}
                   onChange={(e) => setFormData({ ...formData, inverse_confidence: parseFloat(e.target.value) })}
-                  className="w-full"
+                  className="w-full accent-blue-600"
                 />
               ) : (
-                <div className="w-full bg-gray-200 rounded-full h-2">
+                <div className="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-2">
                   <div
                     className="bg-blue-600 h-2 rounded-full"
                     style={{ width: `${((relationship.inverse_confidence || 0) * 100)}%` }}
@@ -325,17 +313,17 @@ export default function RelationInspector({ relationshipId, onClose }: Props) {
 
           {/* Inverse Notes */}
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Inverse Notes</label>
+            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Inverse Notes</label>
             {isEditing ? (
               <textarea
                 value={formData.inverse_notes}
                 onChange={(e) => setFormData({ ...formData, inverse_notes: e.target.value })}
-                className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full border dark:border-gray-600 rounded-md px-3 py-2 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 rows={3}
                 placeholder="Add notes about the inverse relationship..."
               />
             ) : (
-              <p className="text-sm text-gray-700 whitespace-pre-wrap">
+              <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
                 {relationship.inverse_notes || '-'}
               </p>
             )}
@@ -344,10 +332,10 @@ export default function RelationInspector({ relationshipId, onClose }: Props) {
 
         {/* Metadata */}
         {relationship.created_at && (
-          <div className="pt-4 border-t">
+          <div className="pt-4 border-t dark:border-gray-700">
             <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">Created</label>
-              <p className="text-xs text-gray-600">
+              <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Created</label>
+              <p className="text-xs text-gray-600 dark:text-gray-400">
                 {new Date(relationship.created_at).toLocaleString()}
               </p>
             </div>
@@ -356,7 +344,7 @@ export default function RelationInspector({ relationshipId, onClose }: Props) {
       </div>
 
       {/* Footer Actions */}
-      <div className="p-4 border-t bg-gray-50 flex gap-2">
+      <div className="p-4 border-t dark:border-gray-700 bg-gray-50 dark:bg-gray-900 flex gap-2">
         {isEditing ? (
           <>
             <button
@@ -374,7 +362,7 @@ export default function RelationInspector({ relationshipId, onClose }: Props) {
                   });
                 }
               }}
-              className="flex-1 px-4 py-2 text-sm text-gray-700 bg-white border rounded-md hover:bg-gray-50 transition-colors"
+              className="flex-1 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
               disabled={isSaving}
             >
               Cancel

@@ -56,7 +56,12 @@ htmlcov/
 *.tmp
 *.bak
 *.swp
+.run/
+
 
 # Private Cursor files
 .cursor/.*
 .cursor/rules/.*
+
+#exceptions
+!.env.example

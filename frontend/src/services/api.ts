@@ -4,7 +4,9 @@ import type {
   CreateObservationData,
   GraphNode,
   RelationshipResponse,
+  LinkItem,
 } from '../types/graph';
+import type { AppSettings, AppSettingsUpdate } from '../types/settings';
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1',
@@ -40,22 +42,34 @@ export const graphApi = {
   createObservation: (data: CreateObservationData) =>
     api.post<{ id: string; message: string }>('/nodes/observations', data),
 
-  createEntity: (data: { name: string; entity_type?: string; description?: string }) =>
+  createEntity: (data: { name: string; entity_type?: string; description?: string; links?: LinkItem[] }) =>
     api.post<{ id: string; message: string }>('/nodes/entities', data),
 
-  createSource: (data: { title: string; url?: string; source_type?: string; content?: string; published_date?: string }) =>
+  createSource: (data: { title: string; url?: string; source_type?: string; content?: string; published_date?: string; links?: LinkItem[] }) =>
     api.post<{ id: string; message: string }>('/nodes/sources', data),
+
+  createHypothesis: (data: { name: string; claim: string; status?: string; links?: LinkItem[] }) =>
+    api.post<{ id: string; message: string }>('/nodes/hypotheses', data),
+
+  createConcept: (data: { name: string; description?: string; domain?: string; links?: LinkItem[] }) =>
+    api.post<{ id: string; message: string }>('/nodes/concepts', data),
 
   getNode: (id: string) => api.get<GraphNode>(`/nodes/${id}`),
 
-  updateObservation: (id: string, data: { text?: string; confidence?: number; concept_names?: string[] }) =>
+  updateObservation: (id: string, data: { text?: string; confidence?: number; concept_names?: string[]; links?: LinkItem[] }) =>
     api.put<{ id: string; message: string }>(`/nodes/observations/${id}`, data),
 
-  updateEntity: (id: string, data: { name?: string; entity_type?: string; description?: string }) =>
+  updateEntity: (id: string, data: { name?: string; entity_type?: string; description?: string; links?: LinkItem[] }) =>
     api.put<{ id: string; message: string }>(`/nodes/entities/${id}`, data),
 
-  updateHypothesis: (id: string, data: { claim?: string; status?: string }) =>
+  updateHypothesis: (id: string, data: { name?: string; claim?: string; status?: string; links?: LinkItem[] }) =>
     api.put<{ id: string; message: string }>(`/nodes/hypotheses/${id}`, data),
+
+  updateConcept: (id: string, data: { name?: string; description?: string; domain?: string; links?: LinkItem[] }) =>
+    api.put<{ id: string; message: string }>(`/nodes/concepts/${id}`, data),
+
+  updateSource: (id: string, data: { title?: string; url?: string; source_type?: string; content?: string; links?: LinkItem[] }) =>
+    api.put<{ id: string; message: string }>(`/nodes/sources/${id}`, data),
 
   getObservation: (id: string) => api.get<GraphNode>(`/nodes/observations/${id}`),
 
@@ -113,14 +127,8 @@ export const graphApi = {
     api.delete<{ id: string; message: string }>(`/nodes/${nodeId}`),
 
   // Settings
-  getSettings: () => api.get('/settings'),
-  updateSettings: (data: {
-    theme?: 'light' | 'dark';
-    show_edge_labels?: boolean;
-    default_relation_confidence?: number;
-    layout_name?: 'cose' | 'grid' | 'circle';
-    animate_layout?: boolean;
-  }) => api.put('/settings', data),
+  getSettings: () => api.get<AppSettings>('/settings'),
+  updateSettings: (data: AppSettingsUpdate) => api.put<AppSettings>('/settings', data),
 
   approveSuggestion: (suggestionId: string) =>
     api.post(`/suggestions/${suggestionId}/approve`),

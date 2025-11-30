@@ -1,102 +1,96 @@
-import { useRef, useEffect, useState } from 'react';
+import { useRef, useEffect, useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import CytoscapeComponent from 'react-cytoscapejs';
 import cytoscape, { type Core } from 'cytoscape';
 import { graphApi } from '../services/api';
-import type { GraphNode, GraphEdge } from '../types/graph';
+import type { GraphNode, GraphEdge, NodeType } from '../types/graph';
+import type { AppSettings, RelationStyle } from '../types/settings';
 
-// Cytoscape.js stylesheet configuration
-const cytoscapeStylesheet = [
-  {
-    selector: 'node',
-    style: {
-      label: 'data(label)',
-      'text-valign': 'center',
-      'text-halign': 'center',
-      'background-color': '#666',
-      color: '#fff',
-      'font-size': '10px',
-      width: '40px',
-      height: '40px',
-      'text-wrap': 'wrap',
-      'text-max-width': '80px',
-      'text-overflow-wrap': 'whitespace',
+const NODE_TYPES: NodeType[] = ['Observation', 'Hypothesis', 'Source', 'Concept', 'Entity'];
+
+function buildStylesheet(settings?: AppSettings, isDarkMode?: boolean) {
+  const nodeColors = settings?.node_colors || {
+    Observation: '#60A5FA',
+    Hypothesis: '#34D399',
+    Source: '#FBBF24',
+    Concept: '#A78BFA',
+    Entity: '#F87171',
+  };
+  const relationStyles: Record<string, RelationStyle> =
+    (settings?.relation_styles as Record<string, RelationStyle>) || {
+      SUPPORTS: { line_color: '#10B981', target_arrow_color: '#10B981', width: 3, target_arrow_shape: 'triangle' },
+      CONTRADICTS: { line_color: '#EF4444', target_arrow_color: '#EF4444', width: 3, line_style: 'dashed', target_arrow_shape: 'tee' },
+      RELATES_TO: { line_color: '#6B7280', target_arrow_color: '#6B7280', width: 2, target_arrow_shape: 'triangle' },
+    };
+
+  const base: any[] = [
+    // Canvas/core background
+    {
+      selector: 'core',
+      style: {
+        'background-color': isDarkMode ? '#111827' : '#ffffff', // gray-900 vs white
+      },
     },
-  },
-  {
-    selector: 'node[type="Observation"]',
-    style: {
-      'background-color': '#3B82F6', // blue
-      shape: 'ellipse',
+    {
+      selector: 'node',
+      style: {
+        label: 'data(label)',
+        'text-valign': 'center',
+        'text-halign': 'center',
+        color: '#fff',
+        'font-size': '10px',
+        width: '40px',
+        height: '40px',
+        'text-wrap': 'wrap',
+        'text-max-width': '80px',
+        'text-overflow-wrap': 'whitespace',
+      },
     },
-  },
-  {
-    selector: 'node[type="Hypothesis"]',
-    style: {
-      'background-color': '#10B981', // green
-      shape: 'diamond',
+    {
+      selector: 'edge',
+      style: {
+        width: 2,
+        'line-color': isDarkMode ? '#4B5563' : '#cccccc', // gray-600 on dark
+        'target-arrow-color': isDarkMode ? '#4B5563' : '#cccccc',
+        'target-arrow-shape': 'triangle',
+        'curve-style': 'bezier',
+        ...(settings?.show_edge_labels ? { label: 'data(type)' } : {}),
+        'font-size': '8px',
+        // Relation text color
+        color: isDarkMode ? '#ffffff' : '#374151', // white on dark, gray-700 on light
+        'text-rotation': 'autorotate',
+        'text-margin-y': -10,
+      },
     },
-  },
-  {
-    selector: 'node[type="Source"]',
+  ];
+
+  const nodeTypeRules = [
+    { type: 'Observation', shape: 'ellipse' },
+    { type: 'Hypothesis', shape: 'diamond' },
+    { type: 'Source', shape: 'rectangle' },
+    { type: 'Concept', shape: 'hexagon' },
+    { type: 'Entity', shape: 'round-rectangle' },
+  ].map(({ type, shape }) => ({
+    selector: `node[type="${type}"]`,
     style: {
-      'background-color': '#F59E0B', // yellow/orange
-      shape: 'rectangle',
+      'background-color': (nodeColors as any)[type] || '#666',
+      shape,
     },
-  },
-  {
-    selector: 'node[type="Concept"]',
+  }));
+
+  const edgeTypeRules = Object.entries(relationStyles).map(([relType, style]) => ({
+    selector: `edge[type="${relType}"]`,
     style: {
-      'background-color': '#8B5CF6', // purple
-      shape: 'hexagon',
+      ...(style.line_color ? { 'line-color': style.line_color } : {}),
+      ...(style.target_arrow_color ? { 'target-arrow-color': style.target_arrow_color } : {}),
+      ...(style.width ? { width: style.width } : {}),
+      ...(style.line_style ? { 'line-style': style.line_style } : {}),
+      ...(style.target_arrow_shape ? { 'target-arrow-shape': style.target_arrow_shape } : {}),
     },
-  },
-  {
-    selector: 'node[type="Entity"]',
-    style: {
-      'background-color': '#EF4444', // red
-      shape: 'round-rectangle',
-    },
-  },
-  {
-    selector: 'edge',
-    style: {
-      width: 2,
-      'line-color': '#ccc',
-      'target-arrow-color': '#ccc',
-      'target-arrow-shape': 'triangle',
-      'curve-style': 'bezier',
-      label: 'data(type)',
-      'font-size': '8px',
-      'text-rotation': 'autorotate',
-      'text-margin-y': -10,
-    },
-  },
-  {
-    selector: 'edge[type="SUPPORTS"]',
-    style: {
-      'line-color': '#10B981',
-      'target-arrow-color': '#10B981',
-      width: 3,
-    },
-  },
-  {
-    selector: 'edge[type="CONTRADICTS"]',
-    style: {
-      'line-color': '#EF4444',
-      'target-arrow-color': '#EF4444',
-      width: 3,
-      'line-style': 'dashed',
-    },
-  },
-  {
-    selector: 'edge[type="RELATES_TO"]',
-    style: {
-      'line-color': '#6B7280',
-      'target-arrow-color': '#6B7280',
-    },
-  },
-];
+  }));
+
+  return [...base, ...nodeTypeRules, ...edgeTypeRules];
+}
 
 interface Props {
   onNodeSelect?: (nodeId: string | null) => void;
@@ -118,6 +112,34 @@ export default function GraphVisualizer({
   const onEdgeSelectRef = useRef(onEdgeSelect);
   const [internalSelectedNodeId, setInternalSelectedNodeId] = useState<string | null>(null);
   const [internalSelectedEdgeId, setInternalEdgeId] = useState<string | null>(null);
+  const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return false;
+    try {
+      return window.matchMedia('(prefers-color-scheme: dark)').matches;
+    } catch {
+      return false;
+    }
+  });
+  // Sync with system preference changes
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
+    const media = window.matchMedia('(prefers-color-scheme: dark)');
+    const handler = (event: MediaQueryListEvent | MediaQueryList) => {
+      const matches = ('matches' in event ? event.matches : (event as MediaQueryList).matches);
+      setIsDarkMode(matches);
+    };
+    try {
+      // Modern
+      media.addEventListener('change', handler as EventListener);
+      // Initialize on mount (Safari sometimes needs immediate read)
+      setIsDarkMode(media.matches);
+      return () => media.removeEventListener('change', handler as EventListener);
+    } catch {
+      // Legacy Safari
+      (media as any).addListener(handler as any);
+      return () => (media as any).removeListener(handler as any);
+    }
+  }, []);
   
   // Keep the refs updated with the latest callbacks
   useEffect(() => {
@@ -151,10 +173,20 @@ export default function GraphVisualizer({
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['graph', 'full'],
     queryFn: async () => {
-      const response = await graphApi.getFullGraph(500);
+      const response = await graphApi.getFullGraph();
       return response.data;
     },
   });
+
+  const { data: settingsResponse } = useQuery({
+    queryKey: ['settings'],
+    queryFn: async () => {
+      const response = await graphApi.getSettings();
+      return response.data as AppSettings;
+    },
+  });
+
+  const stylesheet = useMemo(() => buildStylesheet(settingsResponse, isDarkMode), [settingsResponse, isDarkMode]);
 
   // Convert graph data to Cytoscape elements format
   const elements = data
@@ -173,10 +205,8 @@ export default function GraphVisualizer({
           
           return {
             data: {
-              id: node.id,
-              label,
-              type: node.type,
               ...node,
+              label,
             },
           };
         }),
@@ -187,12 +217,9 @@ export default function GraphVisualizer({
           const edgeId = edge.id !== undefined && edge.id !== null ? String(edge.id) : `edge-${edge.source}-${edge.target}-${edge.type}`;
           return {
             data: {
-              // Spread edge properties first, then override with our id to ensure it's set correctly
               ...edge,
+              // Override with our computed id to ensure it's set properly
               id: edgeId,
-              source: edge.source,
-              target: edge.target,
-              type: edge.type,
             },
           };
         }),
@@ -203,20 +230,15 @@ export default function GraphVisualizer({
   useEffect(() => {
     const cy = cyRef.current;
     if (!cy || cy.destroyed() || !data || !isReady) {
-      console.log('Tap handler setup skipped:', { cy: !!cy, destroyed: cy?.destroyed(), data: !!data, isReady }); // Debug log
       return;
     }
-
-    console.log('Setting up tap handler'); // Debug log
 
     const handleTap = (event: cytoscape.EventObject) => {
       try {
         const target = event.target as any;
-        console.log('Tap event fired, target:', target); // Debug log
 
         // Background/core taps: deselect
         if (target === cy || typeof target?.isNode !== 'function') {
-          console.log('Background tapped, deselecting'); // Debug log
           setSelectedNodeId(null);
           setSelectedEdgeId(null);
           if (!cy.destroyed()) {
@@ -228,9 +250,8 @@ export default function GraphVisualizer({
         // Node taps: select and highlight
         if (target.isNode()) {
           const nodeId = target.data('id') || target.id();
-          console.log('Node tapped:', nodeId); // Debug log
           setSelectedNodeId(nodeId);
-          setSelectedEdgeId(null); // Clear edge selection when node is selected
+          setSelectedEdgeId(null);
           if (!cy.destroyed()) {
             cy.elements().removeClass('highlighted');
             target.addClass('highlighted');
@@ -244,13 +265,11 @@ export default function GraphVisualizer({
           const edgeId = target.data('id');
           // Check for null/undefined explicitly (not truthiness, since "0" is falsy)
           if (edgeId !== null && edgeId !== undefined && !String(edgeId).startsWith('edge-')) {
-            // This is a real relationship ID from the backend
             setSelectedEdgeId(String(edgeId));
-            setSelectedNodeId(null); // Clear node selection when edge is selected
+            setSelectedNodeId(null);
             if (!cy.destroyed()) {
               cy.elements().removeClass('highlighted');
               target.addClass('highlighted');
-              // Also highlight connected nodes
               target.source().addClass('highlighted');
               target.target().addClass('highlighted');
             }
@@ -259,7 +278,6 @@ export default function GraphVisualizer({
         }
 
         // Other element taps: deselect
-        console.log('Other element tapped, deselecting'); // Debug log
         setSelectedNodeId(null);
         setSelectedEdgeId(null);
         if (!cy.destroyed()) {
@@ -270,22 +288,19 @@ export default function GraphVisualizer({
       }
     };
 
-    // Remove any existing tap handlers first to avoid duplicates
     cy.off('tap');
     cy.on('tap', handleTap);
-    console.log('Tap handler attached'); // Debug log
 
     return () => {
       if (cy && !cy.destroyed()) {
         try {
           cy.off('tap', handleTap);
-          console.log('Tap handler removed'); // Debug log
         } catch (error) {
           console.warn('Error removing tap handler:', error);
         }
       }
     };
-  }, [data, isReady]); // setSelectedNodeId uses ref, so no need in deps
+  }, [data, isReady]);
 
   // Add highlight styles
   useEffect(() => {
@@ -373,10 +388,10 @@ export default function GraphVisualizer({
 
   if (isLoading) {
     return (
-      <div className="h-full bg-white rounded-lg shadow-sm border flex items-center justify-center">
+      <div className="h-full bg-white rounded-lg shadow-sm border flex items-center justify-center dark:bg-gray-800 dark:border-gray-700">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-500">Loading graph...</p>
+          <p className="text-gray-500 dark:text-gray-400">Loading graph...</p>
         </div>
       </div>
     );
@@ -384,7 +399,7 @@ export default function GraphVisualizer({
 
   if (error) {
     return (
-      <div className="h-full bg-white rounded-lg shadow-sm border flex items-center justify-center">
+      <div className="h-full bg-white rounded-lg shadow-sm border flex items-center justify-center dark:bg-gray-800 dark:border-gray-700">
         <div className="text-center">
           <p className="text-red-500 mb-4">Error loading graph</p>
           <button
@@ -400,22 +415,22 @@ export default function GraphVisualizer({
 
   if (!data || (data.nodes.length === 0 && data.edges.length === 0)) {
     return (
-      <div className="h-full bg-white rounded-lg shadow-sm border flex items-center justify-center">
+      <div className="h-full bg-white rounded-lg shadow-sm border flex items-center justify-center dark:bg-gray-800 dark:border-gray-700">
         <div className="text-center">
-          <p className="text-gray-500 mb-2">No nodes yet.</p>
-          <p className="text-sm text-gray-400">Create one to get started!</p>
+          <p className="text-gray-500 mb-2 dark:text-gray-400">No nodes yet.</p>
+          <p className="text-sm text-gray-400 dark:text-gray-500">Create one to get started!</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="h-full flex flex-col bg-white rounded-lg shadow-sm border">
+    <div className="h-full flex flex-col bg-white rounded-lg shadow-sm border dark:bg-gray-800 dark:border-gray-700">
       {/* Graph Controls */}
-      <div className="p-3 border-b flex items-center justify-between bg-gray-50">
+      <div className="p-3 border-b flex items-center justify-between bg-gray-50 dark:bg-gray-900 dark:border-gray-700">
         <div className="flex items-center gap-4">
-          <h3 className="font-semibold text-gray-800">Knowledge Graph</h3>
-          <div className="text-xs text-gray-500">
+          <h3 className="font-semibold text-gray-800 dark:text-gray-100">Knowledge Graph</h3>
+          <div className="text-xs text-gray-500 dark:text-gray-400">
             {data.nodes.length} nodes • {data.edges.length} relationships
           </div>
         </div>
@@ -431,7 +446,7 @@ export default function GraphVisualizer({
                 }
               }
             }}
-            className="px-3 py-1 text-xs bg-white border rounded hover:bg-gray-50"
+            className="px-3 py-1 text-xs bg-white border rounded hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-100 dark:border-gray-700 dark:hover:bg-gray-700"
             title="Fit to view"
           >
             Fit
@@ -447,7 +462,7 @@ export default function GraphVisualizer({
                 }
               }
             }}
-            className="px-3 py-1 text-xs bg-white border rounded hover:bg-gray-50"
+            className="px-3 py-1 text-xs bg-white border rounded hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-100 dark:border-gray-700 dark:hover:bg-gray-700"
             title="Reset view"
           >
             Reset
@@ -456,35 +471,24 @@ export default function GraphVisualizer({
       </div>
 
       {/* Legend */}
-      <div className="px-3 py-2 border-b bg-gray-50 flex items-center gap-4 text-xs">
-        <span className="text-gray-600 font-medium">Legend:</span>
-        <div className="flex items-center gap-1">
-          <div className="w-3 h-3 rounded-full bg-blue-500"></div>
-          <span>Observation</span>
-        </div>
-        <div className="flex items-center gap-1">
-          <div className="w-3 h-3 bg-green-500 transform rotate-45"></div>
-          <span>Hypothesis</span>
-        </div>
-        <div className="flex items-center gap-1">
-          <div className="w-3 h-3 bg-yellow-500"></div>
-          <span>Source</span>
-        </div>
-        <div className="flex items-center gap-1">
-          <div className="w-3 h-3 bg-purple-500 transform rotate-30"></div>
-          <span>Concept</span>
-        </div>
-        <div className="flex items-center gap-1">
-          <div className="w-3 h-3 rounded bg-red-500"></div>
-          <span>Entity</span>
-        </div>
+      <div className="px-3 py-2 border-b bg-gray-50 flex items-center gap-4 text-xs dark:bg-gray-900 dark:border-gray-700">
+        <span className="text-gray-600 font-medium dark:text-gray-300">Legend:</span>
+        {NODE_TYPES.map((t) => (
+          <div key={t} className="flex items-center gap-1">
+            <div
+              className="w-3 h-3 rounded"
+              style={{ backgroundColor: (settingsResponse?.node_colors || {})[t] || '#666' }}
+            ></div>
+            <span className="dark:text-gray-300">{t}</span>
+          </div>
+        ))}
       </div>
 
       {/* Cytoscape Graph */}
       <div className="flex-1 relative">
         <CytoscapeComponent
           elements={elements}
-          stylesheet={cytoscapeStylesheet}
+          stylesheet={stylesheet as any}
           layout={{
             name: 'cose',
             animate: false, // Disable animation to prevent race conditions
@@ -502,7 +506,7 @@ export default function GraphVisualizer({
             initialEnergyOnIncremental: 0.3,
           }}
           style={{ width: '100%', height: '100%' }}
-          cy={(cy) => {
+          cy={(cy: Core) => {
             if (!cy) {
               setIsReady(false);
               setupDoneRef.current = false;
@@ -518,43 +522,28 @@ export default function GraphVisualizer({
 
             // Prevent multiple setups if already done
             if (setupDoneRef.current && cyRef.current === cy) {
-              console.log('Already set up, skipping'); // Debug log
-              // Don't reset isReady if already set up
               return;
             }
 
             cyRef.current = cy;
-            // Only reset isReady if we're doing a fresh setup
             if (!setupDoneRef.current) {
               setIsReady(false);
-              console.log('Resetting isReady to false for new setup'); // Debug log
             }
 
-            // Set up event listeners and configuration
             const setupCytoscape = () => {
               try {
-                console.log('setupCytoscape called', { destroyed: cy.destroyed(), setupDone: setupDoneRef.current }); // Debug log
                 if (cy.destroyed() || setupDoneRef.current) {
-                  console.log('setupCytoscape skipped - already done or destroyed'); // Debug log
                   return;
                 }
 
-                // Enable pan and zoom
                 cy.userPanningEnabled(true);
                 cy.boxSelectionEnabled(true);
                 cy.zoomingEnabled(true);
                 cy.minZoom(0.1);
                 cy.maxZoom(2);
 
-                // Note: Tap handler is set up in useEffect when data is ready
-
                 setupDoneRef.current = true;
-                console.log('setupDoneRef set to true'); // Debug log
-
-                // Mark as ready immediately since we've set up the instance
-                // The ready event will also fire, but we can mark ready now
                 setIsReady(true);
-                console.log('Cytoscape instance marked as ready immediately'); // Debug log
               } catch (error) {
                 console.warn('Error setting up Cytoscape:', error);
                 setIsReady(false);
@@ -562,45 +551,32 @@ export default function GraphVisualizer({
               }
             };
 
-            // Listen for ready event (only once)
             if (!setupDoneRef.current) {
-              console.log('Setting up ready handler'); // Debug log
               const readyHandler = () => {
-                console.log('Ready event fired'); // Debug log
-                // Ensure ready state is set when ready event fires
                 if (!cy.destroyed() && cy === cyRef.current) {
                   setIsReady(true);
-                  console.log('Ready event: marking instance as ready'); // Debug log
                 }
               };
 
               cy.on('ready', readyHandler);
               
-              // Also set up immediately if already ready
               try {
                 if (cy.container()) {
-                  console.log('Container exists, calling setupCytoscape immediately'); // Debug log
                   setupCytoscape();
                 } else {
-                  console.log('No container yet, scheduling setupCytoscape'); // Debug log
-                  // Fallback: set up after a short delay
                   setTimeout(() => {
                     if (!cy.destroyed() && cy === cyRef.current) {
                       setupCytoscape();
                     }
                   }, 150);
                 }
-              } catch (error) {
-                console.log('Container check failed, using timeout fallback', error); // Debug log
-                // If container check fails, use timeout fallback
+              } catch {
                 setTimeout(() => {
                   if (!cy.destroyed() && cy === cyRef.current) {
                     setupCytoscape();
                   }
                 }, 150);
               }
-            } else {
-              console.log('setupDoneRef already true, skipping setup'); // Debug log
             }
           }}
         />
