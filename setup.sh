@@ -4,6 +4,9 @@
 
 set -e  # Exit on error
 
+PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$PROJECT_ROOT"
+
 echo "🚀 Research Connection Graph - Setup"
 echo "===================================="
 echo ""
@@ -64,13 +67,10 @@ if [ $MISSING_DEPS -eq 1 ]; then
     exit 1
 fi
 
-# Change to project root
-# cd "$(dirname "$0")/.."
-
 echo ""
 echo "🐍 Setting up backend..."
 
-cd ./backend
+cd "$PROJECT_ROOT/backend"
 
 # Use uv to create venv and install dependencies
 echo "Installing Python dependencies with uv..."
@@ -112,7 +112,7 @@ if [ ! -f ".env" ]; then
         # macOS
         sed -i '' "s/SECRET_KEY=.*/SECRET_KEY=$SECRET_KEY/" .env
     else
-        # Linux
+        # Linux/Windows Git Bash
         sed -i "s/SECRET_KEY=.*/SECRET_KEY=$SECRET_KEY/" .env
     fi
     
@@ -121,12 +121,12 @@ else
     echo -e "${GREEN}✓${NC} .env already exists"
 fi
 
-cd ..
+cd "$PROJECT_ROOT"
 
 echo ""
 echo "📦 Setting up frontend..."
 
-cd frontend
+cd "$PROJECT_ROOT/frontend"
 
 # Install/update dependencies
 echo "Installing/updating Node dependencies (this may take a minute)..."
@@ -142,7 +142,7 @@ else
     echo -e "${GREEN}✓${NC} .env already exists"
 fi
 
-cd ..
+cd "$PROJECT_ROOT"
 
 echo ""
 echo "🐳 Starting Docker services..."
@@ -193,16 +193,10 @@ fi
 echo ""
 echo -e "${GREEN}✅ Setup complete!${NC}"
 echo ""
-echo "To start the application:"
+echo "To start the application, run:"
 echo ""
-echo "  Terminal 1 (Backend):"
-echo "    cd backend"
-echo "    source .venv/bin/activate"
-echo "    uvicorn app.main:app --reload"
-echo ""
-echo "  Terminal 2 (Frontend):"
-echo "    cd frontend"
-echo "    npm run dev"
+echo "  ./start.sh"
 echo ""
 echo "Then open http://localhost:5173 in your browser"
 echo ""
+

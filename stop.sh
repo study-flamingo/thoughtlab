@@ -4,8 +4,7 @@
 
 set +e  # Don't exit on error - processes might not be running
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RUN_DIR="$PROJECT_ROOT/.run"
 
 echo "🛑 Stopping Research Connection Graph servers..."
@@ -151,3 +150,4 @@ if [ $BACKEND_STOPPED -eq 1 ] || [ $FRONTEND_STOPPED -eq 1 ]; then
 else
     echo "ℹ️  No servers were running"
 fi
+
