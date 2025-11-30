@@ -1,4 +1,5 @@
-# Research Connection Graph
+# ThoughtLab
+- v0.1.0-alpha
 
 A web-based research application that helps you discover meaningful connections between sources, observations, hypotheses, and concepts using graph database technology.
 
@@ -42,7 +43,7 @@ This will:
 ./start.sh
 ```
 
-This starts both backend and frontend servers. Open **http://localhost:5173** in your browser.
+This starts both backend and frontend servers. Open **<http://localhost:5173>** in your browser.
 
 ### Other Commands
 
@@ -94,7 +95,7 @@ docker exec research-graph-neo4j cypher-shell -u neo4j -p research_graph_passwor
 
 #### Via Web Interface
 
-1. Open http://localhost:5173
+1. Open <http://localhost:5173>
 2. Click **"+ Add Node"** button
 3. Select node type (Observation, Source, Hypothesis, Entity)
 4. Fill in the form and click **"Create"**
@@ -133,7 +134,7 @@ curl -X POST "http://localhost:8000/api/v1/nodes/relationships" \
 - **Zoom**: Mouse wheel or pinch gesture
 - **Pan**: Click and drag background
 - **Select Node**: Click to view details
-- **Node Colors**: 
+- **Node Colors**:
   - 🔵 Blue (circle) = Observation
   - 🟢 Green (diamond) = Hypothesis
   - 🟡 Yellow (rectangle) = Source
@@ -142,9 +143,9 @@ curl -X POST "http://localhost:8000/api/v1/nodes/relationships" \
 
 ## API Documentation
 
-- **Swagger UI**: http://localhost:8000/docs
-- **ReDoc**: http://localhost:8000/redoc
-- **Health Check**: http://localhost:8000/health
+- **Swagger UI**: <http://localhost:8000/docs>
+- **ReDoc**: <http://localhost:8000/redoc>
+- **Health Check**: <http://localhost:8000/health>
 
 ## Project Structure
 
@@ -242,7 +243,7 @@ source backend/.venv/bin/activate
 
 ### Frontend connection errors
 
-- Verify backend is running: http://localhost:8000/health
+- Verify backend is running: <http://localhost:8000/health>
 - Check `frontend/.env` has correct `VITE_API_URL`
 
 ### Docker issues
@@ -258,6 +259,7 @@ docker-compose down -v && docker-compose up -d
 ### Neo4j not ready
 
 Neo4j takes ~30 seconds to start. Wait and retry, or check:
+
 ```bash
 docker-compose ps  # Should show "healthy"
 ```

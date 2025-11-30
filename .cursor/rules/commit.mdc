@@ -1,0 +1,12 @@
+---
+description: git push, git pull requests, git sync
+alwaysApply: false
+---
+## GitHub Management
+
+Before pushing to GitHub, update the following documents as well:
+1. [docs/01-PROJECT_OVERVIEW.md](../../docs/01-PROJECT_OVERVIEW.md)
+2. [docs/03-DEVELOPMENT_ROADMAP.md](../../docs/03-DEVELOPMENT_ROADMAP.md)
+3. [docs/SETUP.md](../../docs/SETUP.md)
+4. [docs/TESTING.md](../../docs/TESTING.md)
+5. [docs/PROJECT_MAP.md](../../docs/PROJECT_MAP.md)

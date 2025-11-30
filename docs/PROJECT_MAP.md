@@ -97,17 +97,16 @@ This document maps the repository’s structure, major components, and the respo
   - [scripts/check_versions.py](../scripts/check_versions.py)
 
 ## Documentation
-- Overview & decisions
-  - [01-PROJECT_OVERVIEW.md](./01-PROJECT_OVERVIEW.md)
-  - [02-ARCHITECTURE_DECISIONS.md](./02-ARCHITECTURE_DECISIONS.md)
-  - [03-DEVELOPMENT_ROADMAP.md](./03-DEVELOPMENT_ROADMAP.md)
-  - [04-TECHNICAL_SETUP_GUIDE.md](./04-TECHNICAL_SETUP_GUIDE.md)
-- Top-level guides
-  - [README.md](../README.md)
-  - [BACKEND_SETUP.md](./BACKEND_SETUP.md)
-  - [FRONTEND_SETUP.md](./FRONTEND_SETUP.md)
-  - [UV_SETUP.md](./UV_SETUP.md)
-  - [TESTING.md](./TESTING.md)
+
+| Document | Purpose |
+|----------|---------|
+| [01-PROJECT_OVERVIEW.md](./01-PROJECT_OVERVIEW.md) | Vision, features, scope, technical approach |
+| [02-ARCHITECTURE_DECISIONS.md](./02-ARCHITECTURE_DECISIONS.md) | ADRs for all technology choices |
+| [03-DEVELOPMENT_ROADMAP.md](./03-DEVELOPMENT_ROADMAP.md) | Completed phases + future features |
+| [SETUP.md](./SETUP.md) | Installation and configuration |
+| [TESTING.md](./TESTING.md) | Backend + frontend testing |
+| [DEPENDENCIES.md](./DEPENDENCIES.md) | Package management with uv |
+| [README.md](../README.md) | Project introduction |
 
 ## How pieces connect (data flow)
 - Frontend

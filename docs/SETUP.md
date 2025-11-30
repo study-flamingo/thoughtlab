@@ -1,161 +1,138 @@
-# Setup Instructions
+# Setup Guide
 
-## Prerequisites Check
+## Prerequisites
 
-✅ Python 3.12.3 detected  
-✅ Docker and Docker Compose available  
-⚠️ Node.js not detected - you'll need to install it
+- **Python 3.11+** (pyenv recommended)
+- **Node.js 18+** (nvm recommended)
+- **Docker & Docker Compose**
+- **uv** (Python package manager) — see [DEPENDENCIES.md](./DEPENDENCIES.md)
 
-### Install Node.js (if needed)
+### Verify Prerequisites
 
-**Option 1: Using nvm (recommended)**
 ```bash
-curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
-source ~/.bashrc
-nvm install 18
-nvm use 18
+python --version   # 3.11+
+node --version     # 18+
+docker --version
+uv --version       # Install: curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
-**Option 2: Direct install**
-- Visit https://nodejs.org/ and download Node.js 18+ LTS
+---
 
-## Quick Setup
+## Quick Start
 
 ### 1. Start Docker Services
 
 ```bash
 docker-compose up -d
+docker-compose ps  # Wait for services to be healthy
 ```
 
-Wait for services to be healthy (check with `docker-compose ps`).
+Services:
+- **Neo4j Browser**: http://localhost:7474 (neo4j / research_graph_password)
+- **Redis**: localhost:6379
 
-### 2. Set Up Backend
+### 2. Backend Setup
 
 ```bash
 cd backend
 
 # Create virtual environment
-python3 -m venv venv
-
-# Activate virtual environment
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+uv venv
+source .venv/bin/activate  # Windows: .\.venv\Scripts\Activate.ps1
 
 # Install dependencies
-pip install -r requirements.txt
+uv pip install -r requirements.txt
 
-# Create .env file from example
+# Configure environment
 cp .env.example .env
-
-# Generate a secure SECRET_KEY
-python3 -c "import secrets; print(secrets.token_urlsafe(32))"
-# Copy the output and paste it as SECRET_KEY in .env
-
-# Edit .env and add your OPENAI_API_KEY (if using OpenAI)
-# Or configure for local models (Ollama) if preferred
+# Edit .env: add SECRET_KEY (generate with: python -c "import secrets; print(secrets.token_urlsafe(32))")
+# Edit .env: add OPENAI_API_KEY if using OpenAI
 ```
 
-### 3. Set Up Frontend
+### 3. Frontend Setup
 
 ```bash
 cd frontend
-
-# Install dependencies
 npm install
-
-# Create .env file from example
-cp .env.example .env
+cp .env.example .env  # Optional: configure API URL if not localhost
 ```
 
-### 4. Initialize Databases
+### 4. Initialize Neo4j
 
-**Neo4j:**
-1. Open http://localhost:7474 in your browser
-2. Login with `neo4j` / `research_graph_password`
-3. Run the initialization script (see below)
-
-**PostgreSQL:**
-The schema will be created automatically when you run migrations (Phase 1).
-
-## Next Steps
-
-Once setup is complete, you can:
-
-1. **Start the backend:**
-   ```bash
-   cd backend
-   source venv/bin/activate
-   uvicorn app.main:app --reload
-   ```
-
-2. **Start the frontend:**
-   ```bash
-   cd frontend
-   npm run dev
-   ```
-
-3. **Verify:**
-   - Backend: http://localhost:8000/docs
-   - Frontend: http://localhost:5173
-   - Neo4j Browser: http://localhost:7474
-
-## Neo4j Initialization
-
-After Neo4j is running, connect to the browser and run:
+Run in Neo4j Browser (http://localhost:7474):
 
 ```cypher
-// Unique constraints on IDs
-CREATE CONSTRAINT observation_id IF NOT EXISTS
-FOR (o:Observation) REQUIRE o.id IS UNIQUE;
+// Unique constraints
+CREATE CONSTRAINT observation_id IF NOT EXISTS FOR (o:Observation) REQUIRE o.id IS UNIQUE;
+CREATE CONSTRAINT hypothesis_id IF NOT EXISTS FOR (h:Hypothesis) REQUIRE h.id IS UNIQUE;
+CREATE CONSTRAINT source_id IF NOT EXISTS FOR (s:Source) REQUIRE s.id IS UNIQUE;
+CREATE CONSTRAINT concept_id IF NOT EXISTS FOR (c:Concept) REQUIRE c.id IS UNIQUE;
+CREATE CONSTRAINT entity_id IF NOT EXISTS FOR (e:Entity) REQUIRE e.id IS UNIQUE;
 
-CREATE CONSTRAINT hypothesis_id IF NOT EXISTS
-FOR (h:Hypothesis) REQUIRE h.id IS UNIQUE;
+// Text indexes
+CREATE TEXT INDEX observation_text IF NOT EXISTS FOR (o:Observation) ON o.text;
+CREATE TEXT INDEX hypothesis_claim IF NOT EXISTS FOR (h:Hypothesis) ON h.claim;
 
-CREATE CONSTRAINT source_id IF NOT EXISTS
-FOR (s:Source) REQUIRE s.id IS UNIQUE;
-
-CREATE CONSTRAINT concept_id IF NOT EXISTS
-FOR (c:Concept) REQUIRE c.id IS UNIQUE;
-
-CREATE CONSTRAINT entity_id IF NOT EXISTS
-FOR (e:Entity) REQUIRE e.id IS UNIQUE;
-
-// Index for text search
-CREATE TEXT INDEX observation_text IF NOT EXISTS
-FOR (o:Observation) ON o.text;
-
-CREATE TEXT INDEX hypothesis_claim IF NOT EXISTS
-FOR (h:Hypothesis) ON h.claim;
-
-// Index for temporal queries
-CREATE INDEX observation_created IF NOT EXISTS
-FOR (o:Observation) ON o.created_at;
+// Temporal indexes
+CREATE INDEX observation_created IF NOT EXISTS FOR (o:Observation) ON o.created_at;
 ```
 
-### UUID ID Policy and Backfill
+---
 
-All node and relationship identifiers use UUIDv4 stored in property `id`. If you are upgrading an existing database that previously relied on internal relationship IDs, run the following once:
+## Running the Application
 
-```cypher
-// Assign UUIDs to existing relationships
-MATCH ()-[r]->()
-WHERE r.id IS NULL
-SET r.id = randomUUID();
+### Backend
+
+```bash
+cd backend
+source .venv/bin/activate
+uvicorn app.main:app --reload
 ```
 
-Optional relationship ID indexes (Neo4j 5+):
+- API: http://localhost:8000
+- Docs: http://localhost:8000/docs
+- Health: http://localhost:8000/health
 
-```cypher
-CREATE INDEX rel_id_supports IF NOT EXISTS FOR ()-[r:SUPPORTS]-() ON (r.id);
-CREATE INDEX rel_id_contradicts IF NOT EXISTS FOR ()-[r:CONTRADICTS]-() ON (r.id);
-CREATE INDEX rel_id_relates IF NOT EXISTS FOR ()-[r:RELATES_TO]-() ON (r.id);
+### Frontend
+
+```bash
+cd frontend
+npm run dev
 ```
 
-References:
-- Cypher functions (randomUUID): https://neo4j.com/docs/cypher-manual/4.3/functions/
-- Relationship index hint format (Neo4j 5): https://neo4j.com/docs/status-codes/current/notifications/all-notifications/
+- App: http://localhost:5173
+
+---
+
+## Convenience Scripts
+
+From project root:
+
+```bash
+./start.sh    # Start all services
+./stop.sh     # Stop all services
+./restart.sh  # Restart all services
+```
+
+---
 
 ## Troubleshooting
 
-- **Port conflicts:** Change ports in docker-compose.yml if needed
-- **Python not found:** Use `python3` instead of `python`
-- **Docker issues:** Ensure Docker Desktop is running (if on Windows/Mac)
+**Port conflicts**: Change ports in `docker-compose.yml`
+
+**Connection errors**:
+- Verify Docker services: `docker-compose ps`
+- Check `.env` credentials match `docker-compose.yml`
+- Neo4j takes ~30 seconds to fully start
+
+**Python not found**: Use `python3` instead of `python`
+
+**uv not found**: Restart terminal after installation, or add `~/.cargo/bin` to PATH
+
+---
+
+## Next Steps
+
+- [PROJECT_MAP.md](./PROJECT_MAP.md) — Code structure reference
+- [TESTING.md](./TESTING.md) — Run tests
+- [DEPENDENCIES.md](./DEPENDENCIES.md) — Package management

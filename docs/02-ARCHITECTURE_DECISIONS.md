@@ -417,6 +417,8 @@ LiteLLM because:
 - Must handle rate limits and costs per provider
 - Fallback strategies possible (try Claude, fall back to GPT, fall back to local)
 
+> **Note:** While LiteLLM handles LLM inference, **ADR-013** introduces LangChain specifically for embedding generation and vector operations. These libraries serve complementary purposes: LiteLLM for chat/completion, LangChain for embeddings and retrieval workflows.
+
 ---
 
 ## ADR-007: Embedding Model Selection
@@ -495,6 +497,8 @@ Local sentence-transformers with all-MiniLM-L6-v2 because:
 - Model can be swapped via configuration
 - Need to handle model loading on startup
 - Memory usage increases (model stays in memory)
+
+> **Note:** This decision is extended by **ADR-013** which adds LangChain as a unified interface supporting both local (sentence-transformers) and cloud (OpenAI) embedding models, with storage in Neo4j's native vector indexes.
 
 ---
 
@@ -710,12 +714,15 @@ FastAPI-Users because:
 These decisions create a modern, Python-centric stack optimized for:
 - Graph operations and discovery (Neo4j)
 - AI-powered analysis (LiteLLM, sentence-transformers)
+- **Semantic search and hybrid queries** (LangChain + Neo4j vector indexes)
 - Real-time, async operations (FastAPI, ARQ, WebSocket)
 - Interactive visualization (React, Cytoscape.js)
 - Type safety and maintainability (TypeScript, Pydantic)
 - **Modularity and extensibility** (clear interfaces, separation of concerns)
 
 The architecture balances power with pragmatism, avoiding over-engineering while providing room to grow. All development follows modularity principles (ADR-012) to ensure the codebase can scale with minimal refactoring.
+
+**Vector Strategy Note:** ADR-013 extends ADR-007 (sentence-transformers) by adding a unified LangChain abstraction that supports both local and cloud embedding models, with storage in Neo4j's native vector indexes for powerful hybrid graph+vector queries.
 
 ---
 
@@ -802,6 +809,7 @@ Design with future expansion in mind:
 - New relationship types: Add to `RelationshipType` enum, update Cytoscape styles
 - New visualizations: Graph rendering is isolated in `GraphVisualizer`
 - New settings: Add to `AppSettings` model, update `SettingsModal`
+- New embedding models: Swap via `EmbeddingService` configuration
 
 ### Implementation Guidelines
 
@@ -863,3 +871,269 @@ function NodeInspector() {
 - When a module grows too large, split it before it becomes unwieldy
 - Document extension points in code comments for common expansion scenarios
 - Prefer composition over inheritance for code reuse
+
+---
+
+## ADR-013: Vector Embedding Strategy
+
+### Decision
+Use **LangChain** for embedding generation with **Neo4j's native vector storage** for persistence and search. Support both cloud (OpenAI) and local (sentence-transformers) embedding models.
+
+### Context
+The core discovery feature requires semantic similarity search to find related content across node types. This raises several questions:
+1. Where do embeddings get generated? (Application vs. database)
+2. Where are embeddings stored? (Separate vector DB vs. graph DB)
+3. Which embedding model(s) to support?
+4. How to combine vector search with graph traversal?
+
+### Options Considered
+
+**Embedding Generation:**
+
+| Option | Pros | Cons |
+|--------|------|------|
+| **A: LangChain/LangGraph** | Integrates with AI workflows, model-agnostic, easy swapping | Additional dependency layer |
+| **B: Neo4j GenAI plugin** | All in database, Cypher-native | Tightly coupled to provider, less flexible |
+| **C: Direct API calls** | No abstraction overhead | Hardcoded to one provider, more boilerplate |
+
+**Embedding Storage:**
+
+| Option | Pros | Cons |
+|--------|------|------|
+| **A: Neo4j native vector** | Single database, hybrid queries, graph+vector | Newer feature (5.13+), community edition limits |
+| **B: Separate vector DB (Pinecone/Weaviate)** | Purpose-built, potentially faster | Data split across systems, sync complexity |
+| **C: PostgreSQL pgvector** | Already using Postgres | Separate from graph, can't do hybrid queries |
+
+### Decision Rationale
+
+**LangChain for generation + Neo4j for storage** because:
+
+1. **Hybrid Query Power** — Neo4j uniquely enables queries like:
+   ```cypher
+   // Find similar observations that are connected to a specific hypothesis
+   CALL db.index.vector.queryNodes('observation_embedding', 20, $queryVector)
+   YIELD node AS obs, score
+   WHERE score > 0.7
+   MATCH (obs)-[:SUPPORTS]->(h:Hypothesis {id: $hypothesisId})
+   RETURN obs, score
+   ```
+   This is impossible with a separate vector database.
+
+2. **Single Source of Truth** — All knowledge lives in Neo4j. No synchronization between vector DB and graph DB.
+
+3. **Model Flexibility** — LangChain's abstraction lets us:
+   - Start with OpenAI embeddings for quality
+   - Switch to local models (all-MiniLM-L6-v2) for privacy/cost
+   - Use domain-specific models (SPECTER2 for scientific content) later
+   - No code changes required, only configuration
+
+4. **LangGraph Integration** — Our AI analysis workflows will use LangGraph. Having embeddings in the same ecosystem simplifies the pipeline.
+
+5. **Project Constraints Alignment** — ADR-007 chose local sentence-transformers; this decision extends that by adding a unified interface that supports both local and cloud models.
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        Backend (FastAPI)                        │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  ┌─────────────────┐    ┌──────────────────────────────────┐   │
+│  │  Node Service   │───▶│       Embedding Service          │   │
+│  └─────────────────┘    │  ┌────────────────────────────┐  │   │
+│                         │  │   LangChain Embeddings     │  │   │
+│                         │  │  ┌──────────┬───────────┐  │  │   │
+│                         │  │  │ OpenAI   │  Local    │  │  │   │
+│                         │  │  │ (cloud)  │ (HuggingFace) │  │   │
+│                         │  │  └──────────┴───────────┘  │  │   │
+│                         │  └────────────────────────────┘  │   │
+│                         └──────────────────────────────────┘   │
+│                                       │                         │
+│                                       ▼                         │
+│  ┌─────────────────────────────────────────────────────────┐   │
+│  │                    Neo4j                                 │   │
+│  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────────┐  │   │
+│  │  │   Nodes     │  │  Vectors    │  │  Relationships  │  │   │
+│  │  │ (properties)│  │ (embedding) │  │   (properties)  │  │   │
+│  │  └─────────────┘  └─────────────┘  └─────────────────┘  │   │
+│  │                                                          │   │
+│  │  Vector Indexes: observation_embedding, hypothesis_embedding, etc.  │
+│  └─────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Implementation Plan
+
+**Phase 1: Schema Preparation**
+- Add vector indexes to `init.cypher` (created on-demand, not at startup)
+- Define embedding property naming convention: `embedding` on all node types
+
+**Phase 2: Embedding Service**
+```python
+# backend/app/services/embedding_service.py
+class EmbeddingService:
+    """Unified embedding generation supporting local and cloud models."""
+    
+    def __init__(self, use_local: bool = False):
+        if use_local:
+            self.embeddings = HuggingFaceEmbeddings(
+                model_name="sentence-transformers/all-MiniLM-L6-v2"
+            )
+            self.dimensions = 384
+        else:
+            self.embeddings = OpenAIEmbeddings(
+                model="text-embedding-3-small"
+            )
+            self.dimensions = 1536
+    
+    async def embed_node(self, node_id: str, label: str, text: str) -> None:
+        """Generate and store embedding for a node."""
+        
+    async def find_similar(
+        self, query: str, labels: list[str], k: int = 10
+    ) -> list[SimilarityResult]:
+        """Find semantically similar nodes across types."""
+        
+    def get_vector_store(self, label: str) -> Neo4jVector:
+        """Get LangChain vector store for a node type."""
+```
+
+**Phase 3: Integration Points**
+- Embed on node creation (async, via ARQ worker)
+- Re-embed on significant content updates
+- Provide similarity search API endpoints
+- Use in LangGraph workflows for connection discovery
+
+### Vector Index Schema
+
+```cypher
+-- Vector indexes (create when embeddings exist)
+-- Dimensions depend on model: 1536 (OpenAI) or 384 (MiniLM)
+
+CREATE VECTOR INDEX observation_embedding IF NOT EXISTS
+FOR (o:Observation) ON o.embedding
+OPTIONS {indexConfig: {
+  `vector.dimensions`: 1536,
+  `vector.similarity_function`: 'cosine'
+}}
+
+CREATE VECTOR INDEX hypothesis_embedding IF NOT EXISTS
+FOR (h:Hypothesis) ON h.embedding
+OPTIONS {indexConfig: {
+  `vector.dimensions`: 1536,
+  `vector.similarity_function`: 'cosine'
+}}
+
+CREATE VECTOR INDEX source_embedding IF NOT EXISTS
+FOR (s:Source) ON s.embedding
+OPTIONS {indexConfig: {
+  `vector.dimensions`: 1536,
+  `vector.similarity_function`: 'cosine'
+}}
+
+CREATE VECTOR INDEX concept_embedding IF NOT EXISTS
+FOR (c:Concept) ON c.embedding
+OPTIONS {indexConfig: {
+  `vector.dimensions`: 1536,
+  `vector.similarity_function`: 'cosine'
+}}
+
+CREATE VECTOR INDEX entity_embedding IF NOT EXISTS
+FOR (e:Entity) ON e.embedding
+OPTIONS {indexConfig: {
+  `vector.dimensions`: 1536,
+  `vector.similarity_function`: 'cosine'
+}}
+```
+
+### Configuration
+
+```python
+# backend/app/core/config.py additions
+class Settings(BaseSettings):
+    # Embedding configuration
+    USE_LOCAL_EMBEDDINGS: bool = False
+    EMBEDDING_MODEL: str = "text-embedding-3-small"  # or "all-MiniLM-L6-v2"
+    EMBEDDING_DIMENSIONS: int = 1536  # 1536 for OpenAI, 384 for MiniLM
+    
+    # OpenAI (if using cloud embeddings)
+    OPENAI_API_KEY: str | None = None
+```
+
+### Key Queries
+
+**Pure vector similarity:**
+```cypher
+CALL db.index.vector.queryNodes('observation_embedding', $k, $queryVector)
+YIELD node, score
+RETURN node.id, node.text, score
+ORDER BY score DESC
+```
+
+**Hybrid: Vector + Graph traversal:**
+```cypher
+// Find similar content connected to a specific source
+CALL db.index.vector.queryNodes('observation_embedding', 50, $queryVector)
+YIELD node AS obs, score
+WHERE score > $minScore
+MATCH (obs)-[r]-(s:Source {id: $sourceId})
+RETURN obs, type(r) AS relationship, score
+ORDER BY score DESC
+LIMIT $k
+```
+
+**Hybrid: Vector + Time filter:**
+```cypher
+// Find recent similar observations
+CALL db.index.vector.queryNodes('observation_embedding', 50, $queryVector)
+YIELD node AS obs, score
+WHERE score > 0.7 AND obs.created_at > datetime() - duration('P30D')
+RETURN obs, score
+ORDER BY score DESC
+```
+
+### Trade-offs
+
+**Pros:**
+- Unified data model (graph + vectors in one place)
+- Powerful hybrid queries not possible elsewhere
+- Model-agnostic through LangChain abstraction
+- Supports privacy-first local deployment
+- No external vector DB dependency or sync logic
+
+**Cons:**
+- Neo4j vector indexes are newer (5.13+), less battle-tested than Pinecone/Weaviate
+- Vector index creation requires knowing dimensions upfront
+- Changing embedding models requires re-embedding all nodes
+- LangChain adds a dependency layer
+
+### Consequences
+
+- All node types will have an optional `embedding` property (FLOAT[] / VECTOR type)
+- Vector indexes are created per node label
+- Embedding generation is async (background job) to not block API
+- Settings must include embedding model configuration
+- Changing embedding model requires migration (re-embed all nodes)
+- LangChain becomes a core backend dependency
+- Can leverage Neo4j GDS algorithms alongside vector search for discovery
+
+### Migration Strategy
+
+If changing embedding models (e.g., OpenAI → local):
+1. Update configuration for new model/dimensions
+2. Drop existing vector indexes
+3. Re-embed all nodes via batch job
+4. Create new vector indexes with updated dimensions
+
+```cypher
+-- Migration script (run once)
+DROP INDEX observation_embedding IF EXISTS;
+-- ... (Python batch re-embeds all nodes) ...
+CREATE VECTOR INDEX observation_embedding FOR (o:Observation) ON o.embedding
+OPTIONS {indexConfig: {`vector.dimensions`: 384, `vector.similarity_function`: 'cosine'}}
+```
+
+### References
+- Neo4j Vector Index: https://neo4j.com/docs/cypher-manual/current/indexes/semantic-indexes/vector-indexes/
+- LangChain Neo4jVector: https://python.langchain.com/docs/integrations/vectorstores/neo4jvector
+- db.create.setNodeVectorProperty: https://neo4j.com/docs/operations-manual/current/reference/procedures/
