@@ -64,33 +64,13 @@ if [ $MISSING_DEPS -eq 1 ]; then
     exit 1
 fi
 
-echo ""
-echo "🐳 Checking Docker services..."
-cd "$(dirname "$0")/.."
-
-# Check if Docker services are running
-DOCKER_STATUS=$(docker-compose ps 2>/dev/null | grep -q "Up" && echo "running" || echo "stopped")
-if [ "$DOCKER_STATUS" != "running" ]; then
-    echo -e "${YELLOW}⚠ Docker services not running.${NC}"
-    echo "Docker services are needed for Neo4j initialization during setup."
-    echo "They will be started temporarily for setup, but use './scripts/start.sh' to start them for normal operation."
-    docker-compose up -d
-    echo "⏳ Waiting for services to be healthy..."
-    sleep 10
-    
-    # Check if services are up
-    if ! docker-compose ps | grep -q "healthy"; then
-        echo -e "${YELLOW}⚠ Services are starting. This may take 30-60 seconds.${NC}"
-        echo "Run 'docker-compose ps' to check status."
-    fi
-else
-    echo -e "${GREEN}✓${NC} Docker services are running"
-fi
+# Change to project root
+# cd "$(dirname "$0")/.."
 
 echo ""
 echo "🐍 Setting up backend..."
 
-cd backend
+cd ./backend
 
 # Use uv to create venv and install dependencies
 echo "Installing Python dependencies with uv..."
@@ -165,9 +145,20 @@ fi
 cd ..
 
 echo ""
+echo "🐳 Starting Docker services..."
+
+# Start Docker services if not running
+if ! docker-compose ps 2>/dev/null | grep -q "Up"; then
+    docker-compose up -d
+    echo "⏳ Waiting for services to start..."
+else
+    echo -e "${GREEN}✓${NC} Docker services already running"
+fi
+
+echo ""
 echo "🗄️  Initializing Neo4j..."
 
-# Check if Neo4j is ready
+# Wait for Neo4j to be ready
 MAX_RETRIES=30
 RETRY_COUNT=0
 while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do

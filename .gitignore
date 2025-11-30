@@ -60,3 +60,6 @@ htmlcov/
 # Private Cursor files
 .cursor/.*
 .cursor/rules/.*
+
+#exceptions
+!.env.example
