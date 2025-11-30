@@ -1,4 +1,4 @@
-# ThoughtLab
+# ThoughtLab 💭
 - v0.1.0-alpha
 
 A web-based research application that helps you discover meaningful connections between sources, observations, hypotheses, and concepts using graph database technology.
