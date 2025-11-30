@@ -56,11 +56,17 @@ export default function SettingsModal({ onClose }: Props) {
 	};
 
 	return (
-		<div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={onClose}>
-			<div className="bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-[80vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
-				<div className="px-6 py-4 border-b flex justify-between items-center">
-					<h2 className="text-lg font-semibold text-gray-800">User Settings</h2>
-					<button onClick={onClose} className="text-gray-500 hover:text-gray-700 text-xl leading-none">
+		<div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={onClose}>
+			<div 
+				className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-3xl mx-4 max-h-[80vh] flex flex-col" 
+				onClick={(e) => e.stopPropagation()}
+			>
+				<div className="px-6 py-4 border-b dark:border-gray-700 flex justify-between items-center">
+					<h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100">User Settings</h2>
+					<button 
+						onClick={onClose} 
+						className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 text-xl leading-none"
+					>
 						×
 					</button>
 				</div>
@@ -68,13 +74,13 @@ export default function SettingsModal({ onClose }: Props) {
 				<div className="p-6 space-y-8 overflow-y-auto flex-1 min-h-0">
 					{/* Edge Labels */}
 					<div>
-						<h3 className="text-sm font-semibold text-gray-700 mb-3">Edges</h3>
-						<label className="inline-flex items-center gap-2 text-sm">
+						<h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Edges</h3>
+						<label className="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
 							<input
 								type="checkbox"
 								checked={showEdgeLabels}
 								onChange={(e) => setShowEdgeLabels(e.target.checked)}
-								className="rounded"
+								className="rounded accent-blue-600"
 							/>
 							Show edge labels
 						</label>
@@ -82,17 +88,17 @@ export default function SettingsModal({ onClose }: Props) {
 
 					{/* Node Colors */}
 					<div>
-						<h3 className="text-sm font-semibold text-gray-700 mb-3">Node Colors</h3>
+						<h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Node Colors</h3>
 						<div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
 							{NODE_TYPES.map((t) => (
-								<div key={t} className="flex items-center justify-between gap-4 border rounded-md p-3">
+								<div key={t} className="flex items-center justify-between gap-4 border dark:border-gray-600 rounded-md p-3 bg-white dark:bg-gray-700">
 									<div className="flex items-center gap-2">
 										<div
-											className="w-5 h-5 rounded border"
+											className="w-5 h-5 rounded border dark:border-gray-500"
 											style={{ backgroundColor: localNodeColors[t] || '#666' }}
 											aria-label={`${t} color preview`}
 										/>
-										<span className="text-sm text-gray-700">{t}</span>
+										<span className="text-sm text-gray-700 dark:text-gray-300">{t}</span>
 									</div>
 									<input
 										type="color"
@@ -103,7 +109,7 @@ export default function SettingsModal({ onClose }: Props) {
 												[t]: e.target.value,
 											}))
 										}
-										className="w-14 h-8 p-0 border rounded"
+										className="w-14 h-8 p-0 border dark:border-gray-500 rounded cursor-pointer"
 										aria-label={`${t} color`}
 									/>
 								</div>
@@ -113,16 +119,16 @@ export default function SettingsModal({ onClose }: Props) {
 
 					{/* Relation Styles */}
 					<div>
-						<h3 className="text-sm font-semibold text-gray-700 mb-3">Relation Styles</h3>
+						<h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Relation Styles</h3>
 						<div className="space-y-3">
 							{REL_TYPES.map((rt) => {
 								const style = localRelStyles[rt] || { line_color: '#6B7280', width: 2, target_arrow_shape: 'triangle' };
 								return (
-									<div key={rt} className="border rounded-md p-3">
-										<div className="flex items-center justify-between mb-3">
-											<span className="text-sm font-medium text-gray-700">{rt}</span>
-											<div className="flex items-center gap-3">
-												<label className="text-xs text-gray-600">Line</label>
+									<div key={rt} className="border dark:border-gray-600 rounded-md p-3 bg-white dark:bg-gray-700">
+										<div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+											<span className="text-sm font-medium text-gray-700 dark:text-gray-300">{rt}</span>
+											<div className="flex flex-wrap items-center gap-3">
+												<label className="text-xs text-gray-600 dark:text-gray-400">Line</label>
 												<input
 													type="color"
 													value={style.line_color}
@@ -132,10 +138,10 @@ export default function SettingsModal({ onClose }: Props) {
 															[rt]: { ...style, line_color: e.target.value },
 														}))
 													}
-													className="w-12 h-8 p-0 border rounded"
+													className="w-12 h-8 p-0 border dark:border-gray-500 rounded cursor-pointer"
 													aria-label={`${rt} line color`}
 												/>
-												<label className="text-xs text-gray-600">Arrow</label>
+												<label className="text-xs text-gray-600 dark:text-gray-400">Arrow</label>
 												<input
 													type="color"
 													value={style.target_arrow_color || style.line_color}
@@ -145,10 +151,10 @@ export default function SettingsModal({ onClose }: Props) {
 															[rt]: { ...style, target_arrow_color: e.target.value },
 														}))
 													}
-													className="w-12 h-8 p-0 border rounded"
+													className="w-12 h-8 p-0 border dark:border-gray-500 rounded cursor-pointer"
 													aria-label={`${rt} arrow color`}
 												/>
-												<label className="text-xs text-gray-600">Width</label>
+												<label className="text-xs text-gray-600 dark:text-gray-400">Width</label>
 												<input
 													type="number"
 													min={1}
@@ -160,7 +166,7 @@ export default function SettingsModal({ onClose }: Props) {
 															[rt]: { ...style, width: Number(e.target.value) },
 														}))
 													}
-													className="w-16 px-2 py-1 border rounded text-sm"
+													className="w-16 px-2 py-1 border dark:border-gray-500 rounded text-sm bg-white dark:bg-gray-600 text-gray-900 dark:text-gray-100"
 													aria-label={`${rt} width`}
 												/>
 												<select
@@ -171,7 +177,7 @@ export default function SettingsModal({ onClose }: Props) {
 															[rt]: { ...style, line_style: e.target.value as RelationStyle['line_style'] },
 														}))
 													}
-													className="px-2 py-1 border rounded text-sm"
+													className="px-2 py-1 border dark:border-gray-500 rounded text-sm bg-white dark:bg-gray-600 text-gray-900 dark:text-gray-100"
 													aria-label={`${rt} line style`}
 												>
 													<option value="solid">Solid</option>
@@ -186,7 +192,7 @@ export default function SettingsModal({ onClose }: Props) {
 															[rt]: { ...style, target_arrow_shape: e.target.value as RelationStyle['target_arrow_shape'] },
 														}))
 													}
-													className="px-2 py-1 border rounded text-sm"
+													className="px-2 py-1 border dark:border-gray-500 rounded text-sm bg-white dark:bg-gray-600 text-gray-900 dark:text-gray-100"
 													aria-label={`${rt} arrow shape`}
 												>
 													<option value="triangle">Triangle</option>
@@ -202,8 +208,11 @@ export default function SettingsModal({ onClose }: Props) {
 					</div>
 				</div>
 
-				<div className="px-6 py-4 border-t flex justify-end gap-3">
-					<button onClick={onClose} className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-md transition-colors">
+				<div className="px-6 py-4 border-t dark:border-gray-700 flex justify-end gap-3 bg-gray-50 dark:bg-gray-900 rounded-b-lg">
+					<button 
+						onClick={onClose} 
+						className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors"
+					>
 						Cancel
 					</button>
 					<button
@@ -218,5 +227,3 @@ export default function SettingsModal({ onClose }: Props) {
 		</div>
 	);
 }
-
-

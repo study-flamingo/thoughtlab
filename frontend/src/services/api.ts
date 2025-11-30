@@ -4,6 +4,7 @@ import type {
   CreateObservationData,
   GraphNode,
   RelationshipResponse,
+  LinkItem,
 } from '../types/graph';
 import type { AppSettings, AppSettingsUpdate } from '../types/settings';
 
@@ -41,33 +42,33 @@ export const graphApi = {
   createObservation: (data: CreateObservationData) =>
     api.post<{ id: string; message: string }>('/nodes/observations', data),
 
-  createEntity: (data: { name: string; entity_type?: string; description?: string }) =>
+  createEntity: (data: { name: string; entity_type?: string; description?: string; links?: LinkItem[] }) =>
     api.post<{ id: string; message: string }>('/nodes/entities', data),
 
-  createSource: (data: { title: string; url?: string; source_type?: string; content?: string; published_date?: string }) =>
+  createSource: (data: { title: string; url?: string; source_type?: string; content?: string; published_date?: string; links?: LinkItem[] }) =>
     api.post<{ id: string; message: string }>('/nodes/sources', data),
 
-  createHypothesis: (data: { claim: string; status?: string }) =>
+  createHypothesis: (data: { name: string; claim: string; status?: string; links?: LinkItem[] }) =>
     api.post<{ id: string; message: string }>('/nodes/hypotheses', data),
 
-  createConcept: (data: { name: string; description?: string; domain?: string }) =>
+  createConcept: (data: { name: string; description?: string; domain?: string; links?: LinkItem[] }) =>
     api.post<{ id: string; message: string }>('/nodes/concepts', data),
 
   getNode: (id: string) => api.get<GraphNode>(`/nodes/${id}`),
 
-  updateObservation: (id: string, data: { text?: string; confidence?: number; concept_names?: string[] }) =>
+  updateObservation: (id: string, data: { text?: string; confidence?: number; concept_names?: string[]; links?: LinkItem[] }) =>
     api.put<{ id: string; message: string }>(`/nodes/observations/${id}`, data),
 
-  updateEntity: (id: string, data: { name?: string; entity_type?: string; description?: string }) =>
+  updateEntity: (id: string, data: { name?: string; entity_type?: string; description?: string; links?: LinkItem[] }) =>
     api.put<{ id: string; message: string }>(`/nodes/entities/${id}`, data),
 
-  updateHypothesis: (id: string, data: { claim?: string; status?: string }) =>
+  updateHypothesis: (id: string, data: { name?: string; claim?: string; status?: string; links?: LinkItem[] }) =>
     api.put<{ id: string; message: string }>(`/nodes/hypotheses/${id}`, data),
 
-  updateConcept: (id: string, data: { name?: string; description?: string; domain?: string }) =>
+  updateConcept: (id: string, data: { name?: string; description?: string; domain?: string; links?: LinkItem[] }) =>
     api.put<{ id: string; message: string }>(`/nodes/concepts/${id}`, data),
 
-  updateSource: (id: string, data: { title?: string; url?: string; source_type?: string; content?: string }) =>
+  updateSource: (id: string, data: { title?: string; url?: string; source_type?: string; content?: string; links?: LinkItem[] }) =>
     api.put<{ id: string; message: string }>(`/nodes/sources/${id}`, data),
 
   getObservation: (id: string) => api.get<GraphNode>(`/nodes/observations/${id}`),

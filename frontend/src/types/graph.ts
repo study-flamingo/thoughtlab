@@ -7,6 +7,11 @@ export type RelationshipType =
   | 'OBSERVED_IN' 
   | 'DISCUSSES';
 
+export interface LinkItem {
+  url: string;
+  label?: string;
+}
+
 export interface GraphNode {
   id: string;
   type: NodeType;
@@ -16,6 +21,7 @@ export interface GraphNode {
   description?: string; // For Entity nodes
   confidence?: number;
   concept_names?: string[];
+  links?: LinkItem[]; // Clickable links for any node type
   created_at: string;
   updated_at?: string;
 }

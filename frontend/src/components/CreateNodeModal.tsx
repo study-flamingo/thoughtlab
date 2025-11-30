@@ -14,10 +14,12 @@ export default function CreateNodeModal({ onClose }: Props) {
   // Source fields
   const [title, setTitle] = useState('');
   const [url, setUrl] = useState('');
+  const [sourceType, setSourceType] = useState('paper');
   // Entity fields
   const [entityName, setEntityName] = useState('');
   const [entityDescription, setEntityDescription] = useState('');
   // Hypothesis fields
+  const [hypothesisName, setHypothesisName] = useState('');
   const [claim, setClaim] = useState('');
   const [status, setStatus] = useState('proposed');
   // Concept fields
@@ -44,8 +46,8 @@ export default function CreateNodeModal({ onClose }: Props) {
   });
 
   const createSourceMutation = useMutation({
-    mutationFn: (payload: { title: string; url?: string }) =>
-      graphApi.createSource({ title: payload.title, url: payload.url }),
+    mutationFn: (payload: { title: string; url?: string; source_type?: string }) =>
+      graphApi.createSource({ title: payload.title, url: payload.url, source_type: payload.source_type }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['graph'] });
       onClose();
@@ -53,7 +55,7 @@ export default function CreateNodeModal({ onClose }: Props) {
   });
 
   const createHypothesisMutation = useMutation({
-    mutationFn: (payload: { claim: string; status?: string }) =>
+    mutationFn: (payload: { name: string; claim: string; status?: string }) =>
       graphApi.createHypothesis(payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['graph'] });
@@ -83,9 +85,11 @@ export default function CreateNodeModal({ onClose }: Props) {
       createSourceMutation.mutate({
         title,
         url: url || undefined,
+        source_type: sourceType || undefined,
       });
     } else if (nodeType === 'hypothesis') {
       createHypothesisMutation.mutate({
+        name: hypothesisName,
         claim,
         status: status || undefined,
       });
@@ -100,18 +104,18 @@ export default function CreateNodeModal({ onClose }: Props) {
 
   return (
     <div
-      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+      className="fixed inset-0 bg-black/60 flex items-center justify-center z-50"
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-lg shadow-xl w-full max-w-lg"
+        className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="px-6 py-4 border-b flex justify-between items-center">
-          <h2 className="text-lg font-semibold text-gray-800">Create New Node</h2>
+        <div className="px-6 py-4 border-b dark:border-gray-700 flex justify-between items-center">
+          <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100">Create New Node</h2>
           <button
             onClick={onClose}
-            className="text-gray-500 hover:text-gray-700 text-xl leading-none"
+            className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 text-xl leading-none"
           >
             ×
           </button>
@@ -119,13 +123,13 @@ export default function CreateNodeModal({ onClose }: Props) {
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Node Type
             </label>
             <select
               value={nodeType}
               onChange={(e) => setNodeType(e.target.value)}
-              className="w-full border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full border dark:border-gray-600 rounded-md px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="observation">Observation</option>
               <option value="hypothesis">Hypothesis</option>
@@ -138,20 +142,20 @@ export default function CreateNodeModal({ onClose }: Props) {
           {nodeType === 'observation' && (
             <>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Observation Text
                 </label>
                 <textarea
                   value={text}
                   onChange={(e) => setText(e.target.value)}
-                  className="w-full border rounded-md px-3 py-2 h-32 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full border dark:border-gray-600 rounded-md px-3 py-2 h-32 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="Describe what you observed..."
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Confidence: {(confidence * 100).toFixed(0)}%
                 </label>
                 <input
@@ -161,7 +165,7 @@ export default function CreateNodeModal({ onClose }: Props) {
                   step="0.05"
                   value={confidence}
                   onChange={(e) => setConfidence(parseFloat(e.target.value))}
-                  className="w-full"
+                  className="w-full accent-blue-600"
                 />
               </div>
             </>
@@ -170,29 +174,55 @@ export default function CreateNodeModal({ onClose }: Props) {
           {nodeType === 'source' && (
             <>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Title
                 </label>
                 <input
                   type="text"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  className="w-full border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full border dark:border-gray-600 rounded-md px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="Source title..."
                   required
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   URL (optional)
                 </label>
                 <input
                   type="url"
                   value={url}
                   onChange={(e) => setUrl(e.target.value)}
-                  className="w-full border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full border dark:border-gray-600 rounded-md px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="https://..."
                 />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Source Type
+                </label>
+                <input
+                  type="text"
+                  list="create-source-type-suggestions"
+                  value={sourceType}
+                  onChange={(e) => setSourceType(e.target.value)}
+                  className="w-full border dark:border-gray-600 rounded-md px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="e.g., paper, article, video..."
+                />
+                <datalist id="create-source-type-suggestions">
+                  <option value="paper" />
+                  <option value="article" />
+                  <option value="book" />
+                  <option value="website" />
+                  <option value="forum" />
+                  <option value="video" />
+                  <option value="podcast" />
+                  <option value="social media" />
+                  <option value="documentation" />
+                  <option value="report" />
+                  <option value="other" />
+                </datalist>
               </div>
             </>
           )}
@@ -200,26 +230,26 @@ export default function CreateNodeModal({ onClose }: Props) {
           {nodeType === 'entity' && (
             <>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Entity Name
                 </label>
                 <input
                   type="text"
                   value={entityName}
                   onChange={(e) => setEntityName(e.target.value)}
-                  className="w-full border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full border dark:border-gray-600 rounded-md px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="Enter entity name..."
                   required
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Description (optional)
                 </label>
                 <textarea
                   value={entityDescription}
                   onChange={(e) => setEntityDescription(e.target.value)}
-                  className="w-full border rounded-md px-3 py-2 h-32 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full border dark:border-gray-600 rounded-md px-3 py-2 h-32 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="Describe the entity..."
                 />
               </div>
@@ -229,25 +259,38 @@ export default function CreateNodeModal({ onClose }: Props) {
           {nodeType === 'hypothesis' && (
             <>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Name
+                </label>
+                <input
+                  type="text"
+                  value={hypothesisName}
+                  onChange={(e) => setHypothesisName(e.target.value)}
+                  className="w-full border dark:border-gray-600 rounded-md px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Short name for display..."
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Claim
                 </label>
                 <textarea
                   value={claim}
                   onChange={(e) => setClaim(e.target.value)}
-                  className="w-full border rounded-md px-3 py-2 h-32 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="State your hypothesis..."
+                  className="w-full border dark:border-gray-600 rounded-md px-3 py-2 h-32 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Full hypothesis statement..."
                   required
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Status
                 </label>
                 <select
                   value={status}
                   onChange={(e) => setStatus(e.target.value)}
-                  className="w-full border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full border dark:border-gray-600 rounded-md px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="proposed">Proposed</option>
                   <option value="tested">Tested</option>
@@ -261,37 +304,37 @@ export default function CreateNodeModal({ onClose }: Props) {
           {nodeType === 'concept' && (
             <>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Concept Name
                 </label>
                 <input
                   type="text"
                   value={conceptName}
                   onChange={(e) => setConceptName(e.target.value)}
-                  className="w-full border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full border dark:border-gray-600 rounded-md px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="Enter concept name..."
                   required
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Description (optional)
                 </label>
                 <textarea
                   value={conceptDescription}
                   onChange={(e) => setConceptDescription(e.target.value)}
-                  className="w-full border rounded-md px-3 py-2 h-24 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full border dark:border-gray-600 rounded-md px-3 py-2 h-24 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="Describe the concept..."
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Domain
                 </label>
                 <select
                   value={domain}
                   onChange={(e) => setDomain(e.target.value)}
-                  className="w-full border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full border dark:border-gray-600 rounded-md px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="general">General</option>
                   <option value="science">Science</option>
@@ -306,11 +349,11 @@ export default function CreateNodeModal({ onClose }: Props) {
             </>
           )}
 
-          <div className="flex justify-end gap-3 pt-4">
+          <div className="flex justify-end gap-3 pt-4 border-t dark:border-gray-700 mt-4">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
+              className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors"
             >
               Cancel
             </button>
