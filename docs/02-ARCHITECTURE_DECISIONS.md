@@ -6,6 +6,8 @@ This document captures the technical architecture for the Research Connection Gr
 
 ## Quick Reference
 
+🔄 = Interim decision with planned future changes
+
 | Concern | Decision | Key Rationale |
 |---------|----------|---------------|
 | Graph Database | Neo4j | Native graph ops, vector indexes, Cypher |
@@ -14,8 +16,8 @@ This document captures the technical architecture for the Research Connection Gr
 | Backend Framework | FastAPI | Async-native, auto-docs, WebSocket built-in |
 | Background Jobs | ARQ (Redis) | Async-native, matches FastAPI patterns |
 | Real-Time | FastAPI WebSocket | Zero dependencies, bi-directional |
-| Authentication | FastAPI-Users + JWT | Self-hosted, async-compatible |
-| LLM & Embeddings | LangChain + OpenAI | Unified AI layer, hybrid graph+vector queries |
+| Authentication | FastAPI-Users + JWT 🔄 | Self-hosted, async-compatible |
+| LLM & Embeddings | LangChain + OpenAI 🔄 | Unified AI layer, hybrid graph+vector queries |
 | Frontend Framework | React + TypeScript + Vite | Ecosystem, type safety, fast builds |
 | Graph Visualization | Cytoscape.js | Purpose-built, layout algorithms |
 
@@ -200,10 +202,7 @@ OPTIONS {indexConfig: {
 - ⚠️ Requires OpenAI API key and ongoing API costs
 - ⚠️ Neo4j vector indexes are newer (5.13+)
 
-**Alternatives Rejected:**
-- *LiteLLM* — Provider abstraction not needed when committed to OpenAI
-- *Direct OpenAI SDK* — Less integration with Neo4j, no LangGraph path
-- *Separate vector DB* — Can't do hybrid graph+vector queries
+> **🔄 INTERIM DECISION:** Currently hardcoded to OpenAI. Future work will add provider selection via settings (OpenAI, Anthropic, local models via Ollama) to support privacy-first and cost-conscious deployments.
 
 **Future: Model Migration**
 
@@ -307,6 +306,8 @@ OPTIONS {indexConfig: {`vector.dimensions`: 384, `vector.similarity_function`: '
 - ✅ Full control over user data
 - ⚠️ Must implement email for password reset
 - ⚠️ No built-in MFA (can add later)
+
+> **🔄 INTERIM DECISION:** FastAPI-Users with JWT is the starting point. Future work will implement **OAuth 2.1** for standards-compliant authentication, social login support, and better security practices.
 
 **Alternatives Rejected:**
 - *Auth0/Supabase* — External dependency, costs, data leaves system
