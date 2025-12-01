@@ -7,6 +7,7 @@ import type {
   LinkItem,
 } from '../types/graph';
 import type { AppSettings, AppSettingsUpdate } from '../types/settings';
+import type { Activity, ActivityFilter } from '../types/activity';
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1',
@@ -130,11 +131,52 @@ export const graphApi = {
   getSettings: () => api.get<AppSettings>('/settings'),
   updateSettings: (data: AppSettingsUpdate) => api.put<AppSettings>('/settings', data),
 
-  approveSuggestion: (suggestionId: string) =>
-    api.post(`/suggestions/${suggestionId}/approve`),
+  // Activity Feed
+  getActivities: (filter?: ActivityFilter) => {
+    const params: Record<string, string | number | boolean | undefined> = {};
+    if (filter?.types?.length) {
+      params.types = filter.types.join(',');
+    }
+    if (filter?.status) {
+      params.status = filter.status;
+    }
+    if (filter?.node_id) {
+      params.node_id = filter.node_id;
+    }
+    if (filter?.group_id) {
+      params.group_id = filter.group_id;
+    }
+    if (filter?.since) {
+      params.since = filter.since;
+    }
+    if (filter?.limit) {
+      params.limit = filter.limit;
+    }
+    if (filter?.include_dismissed) {
+      params.include_dismissed = filter.include_dismissed;
+    }
+    return api.get<Activity[]>('/activities', { params });
+  },
 
-  rejectSuggestion: (suggestionId: string) =>
-    api.post(`/suggestions/${suggestionId}/reject`),
+  getActivity: (id: string) => api.get<Activity>(`/activities/${id}`),
+
+  getPendingSuggestions: (limit = 20) =>
+    api.get<Activity[]>('/activities/pending', { params: { limit } }),
+
+  getProcessingStatus: (nodeId: string) =>
+    api.get<Activity | null>(`/activities/processing/${nodeId}`),
+
+  approveSuggestion: (activityId: string) =>
+    api.post<{ message: string; relationship_id: string; activity_id: string }>(
+      `/activities/${activityId}/approve`
+    ),
+
+  rejectSuggestion: (activityId: string, feedback?: string) =>
+    api.post<{ message: string; activity_id: string; feedback_stored: boolean }>(
+      `/activities/${activityId}/reject`,
+      null,
+      { params: feedback ? { feedback } : undefined }
+    ),
 };
 
 export default api;

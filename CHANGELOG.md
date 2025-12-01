@@ -8,16 +8,71 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+
+#### Activity Feed System
+- **Activity model** (`backend/app/models/activity.py`) - Comprehensive activity types for tracking system events
+  - Node/relationship lifecycle events
+  - Processing status (chunking, embedding, analyzing)
+  - LLM suggestions with approve/reject workflow
+  - Confidence thresholds: auto-create (>0.8), suggest (0.6-0.8), discard (<0.6)
+- **ActivityService** (`backend/app/services/activity_service.py`) - CRUD operations for activities
+- **Activity API routes** (`backend/app/api/routes/activities.py`) - REST endpoints for activity management
+- **Interactive ActivityFeed** (`frontend/src/components/ActivityFeed.tsx`) - Real-time feed with:
+  - Polling for updates
+  - Approve/reject buttons for suggestions
+  - "View" navigation to relevant nodes
+  - Processing progress display
+  - Status badges for completed actions
+
+#### Background Processing Infrastructure
+- **ProcessingService** (`backend/app/services/processing_service.py`) - Orchestrates node analysis workflow:
+  - Chunking → Embedding → Analysis → Suggestions
+  - Activity feed status updates at each stage
+  - Error handling with activity notifications
+- **EmbeddingService stub** (`backend/app/services/embedding_service.py`) - Interface for LangChain integration
+- **Chunking utility** (`backend/app/utils/chunking.py`) - RecursiveCharacterSplitter for long content
+  - Configurable chunk size and overlap
+  - Position tracking for reconstruction
+  - Threshold detection (skip chunking for short content)
+
+#### Schema Updates
+- `Activity` node in Neo4j with indexes for efficient querying
+- Activity TypeScript types (`frontend/src/types/activity.ts`)
+- API service methods for activity operations
+
+#### Test Coverage
+- **Test runner script** (`test.sh`) - Unified test runner for both frontend and backend
+  - `./test.sh` - Run all tests
+  - `./test.sh backend` - Run only backend tests
+  - `./test.sh frontend` - Run only frontend tests
+  - `./test.sh --quick` - Run unit tests only (no Neo4j required)
+- **Backend model tests** (`backend/tests/test_activity_models.py`) - 28 tests for Activity models
+  - `ActivityType`, `ActivityStatus`, `SuggestionData`, `ProcessingData`
+  - `ActivityCreate`, `ActivityUpdate`, `ActivityResponse`, `ActivityFilter`
+  - `SuggestionThresholds` with confidence action logic
+- **Backend service tests** (`backend/tests/test_activity_service.py`) - 24 tests for ActivityService
+  - CRUD operations, filtering, suggestions workflow
+  - Processing status updates, approve/reject logic
+- **Backend API tests** (`backend/tests/test_api_activities.py`) - 18 tests for activity routes
+- **Frontend activity tests** (`frontend/src/types/__tests__/activity.test.ts`) - 32 tests for type helpers
+- **Frontend API tests** (`frontend/src/services/__tests__/api.test.ts`) - 28 tests including activity endpoints
+- **Frontend ActivityFeed tests** (`frontend/src/components/__tests__/ActivityFeed.test.tsx`) - 28 tests
+  - Loading/error states, activity display, approve/reject interactions
+  - Polling behavior, navigation callbacks, timestamp formatting
+
+### Changed
+- Relationship types changed from enum to open strings (allows LLM-created relationship types)
+- Existing tests updated for new model signatures (`HypothesisCreate.name`, relationship type strings)
+- Added missing `ChunkUpdate` model to `nodes.py`
 - Architecture decision documentation reorganized by concern (previously ADR log format)
 - Vector embedding strategy documented (LangChain + OpenAI + Neo4j vectors)
 - Interim decision markers (🔄) for planned future changes
 - Consolidated `DEPENDENCIES.md` for package management reference
 - Cursor rules for commit and package management workflows
-
-### Changed
 - `02-ARCHITECTURE_DECISIONS.md` restructured from ADR log to flat reference format
 - AI strategy unified: LangChain + OpenAI for both LLM and embeddings (replacing LiteLLM)
 - Documentation consolidated: removed redundant setup/dependency docs
+- ActivityFeed now receives `onSelectNode` callback for navigation
 
 ### Removed
 - `BACKEND_SETUP.md` - merged into `SETUP.md`

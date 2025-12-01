@@ -12,11 +12,11 @@ alwaysApply: true
    - Future Development ideas: [03-DEVELOPMENT_ROADMAP.md](../../docs/03-DEVELOPMENT_ROADMAP.md)
    - Testing: [TESTING.md](../../docs/TESTING.md)
 3. Current documentation is a priority. When making changes that may impact end-user workflows, be sure to update any relevant documentation, including the [README.md](../../README.md), [PROJECT_MAP.md](../../docs/PROJECT_MAP.md), and [SETUP.md](../../docs/SETUP.md) if appropriate.
-4. Always reference the most current documentation possible for packages, depending on the version we are using. **Use the context7 MCP server** proactively.
+4. Always reference the most current documentation possible for packages, depending on the version we are using. **Use the Context7 MCP server** proactively if available.
 
 ## Development Principles
 
-Before diving into implementation, keep these core principles in mind throughout development:
+When writing code, follow these principles:
 
 ### Modularity First
 Design every feature with **modularity** in mind to facilitate easy expansion as the project grows, with minimal refactoring necessary. This means:
@@ -27,7 +27,11 @@ Design every feature with **modularity** in mind to facilitate easy expansion as
 - **Minimal Coupling**: Components communicate via props/callbacks, not global state
 - **Easy Extension Points**: New node types, relationship types, and features should require isolated changes
 
-See [ADR-012: Development Principles](./02-ARCHITECTURE_DECISIONS.md#adr-012-development-principles---modularity-and-extensibility) for detailed guidelines and examples.
+See [02-Architecture Decisions: Development Principles](../../docs/02-ARCHITECTURE_DECISIONS.md#Development-Principles) for more detailed guidelines and examples.
+
+### Human-in-the-loop
+
+The user wants to collaborate with you for design/architecture decisions throughout this project. For decisions that may have a large impact throughout development or may require large refactors to change later, **ask the user for input**.
 
 ### Quality Standards
 - Write tests for new features (pytest for backend, vitest for frontend)

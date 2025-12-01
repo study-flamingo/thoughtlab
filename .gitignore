@@ -11,6 +11,7 @@ ENV/
 *.egg-info/
 dist/
 build/
+docs/.*.md
 
 # Environment variables
 .env

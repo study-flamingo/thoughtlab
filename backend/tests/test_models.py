@@ -5,7 +5,6 @@ from app.models.nodes import (
     SourceCreate,
     HypothesisCreate,
     RelationshipCreate,
-    RelationshipType,
 )
 
 
@@ -57,9 +56,11 @@ def test_source_create_valid():
 def test_hypothesis_create_valid():
     """Test valid hypothesis creation"""
     hypothesis = HypothesisCreate(
+        name="Test Name",
         claim="Test hypothesis",
         status="proposed",
     )
+    assert hypothesis.name == "Test Name"
     assert hypothesis.claim == "Test hypothesis"
     assert hypothesis.status == "proposed"
 
@@ -69,10 +70,10 @@ def test_relationship_create_valid():
     rel = RelationshipCreate(
         from_id="id1",
         to_id="id2",
-        relationship_type=RelationshipType.SUPPORTS,
+        relationship_type="SUPPORTS",
         confidence=0.9,
     )
     assert rel.from_id == "id1"
     assert rel.to_id == "id2"
-    assert rel.relationship_type == RelationshipType.SUPPORTS
+    assert rel.relationship_type == "SUPPORTS"
     assert rel.confidence == 0.9

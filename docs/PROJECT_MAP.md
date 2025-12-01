@@ -16,10 +16,17 @@ This document maps the repository’s structure, major components, and the respo
   - [app/api/routes/nodes.py](../backend/app/api/routes/nodes.py): CRUD for `Observation`, `Source`, `Hypothesis`, `Entity`; relationship CRUD; generic `GET /nodes/{id}`; `GET /{id}/connections`; `DELETE /nodes/{id}`.
   - [app/api/routes/graph.py](../backend/app/api/routes/graph.py): `GET /graph/full` for full graph visualization payload.
   - [app/api/routes/settings.py](../backend/app/api/routes/settings.py): `GET /settings` and `PUT /settings` for app-wide settings (theme, layout, colors).
+  - [app/api/routes/activities.py](../backend/app/api/routes/activities.py): Activity feed endpoints; approve/reject suggestions; processing status queries.
 - Services (domain logic)
   - [app/services/graph_service.py](../backend/app/services/graph_service.py): All Neo4j Cypher logic; create/update/read/delete nodes; create/update/delete relationships; `get_node_connections`; `get_full_graph`; settings management; JSON-safe conversions.
+  - [app/services/activity_service.py](../backend/app/services/activity_service.py): Activity feed CRUD; suggestion approve/reject workflow; processing status tracking.
+  - [app/services/embedding_service.py](../backend/app/services/embedding_service.py): Embedding interface (stub for LangChain integration); vector storage in Neo4j.
+  - [app/services/processing_service.py](../backend/app/services/processing_service.py): Background processing orchestrator; chunking → embedding → analysis pipeline.
+- Utilities
+  - [app/utils/chunking.py](../backend/app/utils/chunking.py): RecursiveCharacterSplitter for breaking long content into embeddable chunks.
 - Models (request/response DTOs, enums)
-  - [app/models/nodes.py](../backend/app/models/nodes.py): Pydantic models for node types (`Observation`, `Hypothesis`, `Source`, `Concept`, `Entity`) and `RelationshipType`; `*Create`/`*Update`/`*Response` DTOs.
+  - [app/models/nodes.py](../backend/app/models/nodes.py): Pydantic models for node types (`Observation`, `Hypothesis`, `Source`, `Concept`, `Entity`, `Chunk`) and open relationship types; `*Create`/`*Update`/`*Response` DTOs.
+  - [app/models/activity.py](../backend/app/models/activity.py): Activity types, status enums, suggestion data, processing data, confidence thresholds.
   - [app/models/settings.py](../backend/app/models/settings.py): `AppSettings`, `AppSettingsUpdate`, `RelationStyle` models for application configuration.
 - Database connectors
   - [app/db/neo4j.py](../backend/app/db/neo4j.py): Async driver manager, `neo4j_conn.get_session()`.
@@ -56,6 +63,13 @@ This document maps the repository’s structure, major components, and the respo
 - Settings
   - `GET /api/v1/settings` → get app settings
   - `PUT /api/v1/settings` → update app settings
+- Activities
+  - `GET /api/v1/activities` → list activities (with filters)
+  - `GET /api/v1/activities/pending` → get pending suggestions
+  - `GET /api/v1/activities/processing/{node_id}` → get processing status for a node
+  - `GET /api/v1/activities/{id}` → get single activity
+  - `POST /api/v1/activities/{id}/approve` → approve suggestion, create relationship
+  - `POST /api/v1/activities/{id}/reject` → reject suggestion with optional feedback
 
 ## Frontend (React + Vite)
 - App bootstrap
@@ -68,11 +82,12 @@ This document maps the repository’s structure, major components, and the respo
   - [components/CreateNodeModal.tsx](../frontend/src/components/CreateNodeModal.tsx): Tabbed modal for creating Observation/Source/Entity nodes; invalidates graph and closes.
   - [components/CreateRelationModal.tsx](../frontend/src/components/CreateRelationModal.tsx): Modal for creating relationships between existing nodes; supports relationship type, confidence, notes, and inverse relationships.
   - [components/SettingsModal.tsx](../frontend/src/components/SettingsModal.tsx): App settings configuration (theme, layout, edge labels, node colors, relation styles).
-  - [components/ActivityFeed.tsx](../frontend/src/components/ActivityFeed.tsx): Placeholder UI for future real-time updates.
+  - [components/ActivityFeed.tsx](../frontend/src/components/ActivityFeed.tsx): Interactive activity feed with polling; displays node/relationship events, processing status, LLM suggestions; approve/reject actions; navigation to nodes.
 - API client and types
-  - [services/api.ts](../frontend/src/services/api.ts): Axios client; endpoints for full graph, node CRUD, relationship CRUD, settings.
+  - [services/api.ts](../frontend/src/services/api.ts): Axios client; endpoints for full graph, node CRUD, relationship CRUD, settings, activities.
   - [types/graph.ts](../frontend/src/types/graph.ts): TS types for nodes, edges, graph payloads, relationship types.
   - [types/settings.ts](../frontend/src/types/settings.ts): TS types for app settings, relation styles, theme options.
+  - [types/activity.ts](../frontend/src/types/activity.ts): TS types for activities, suggestions, processing data; helper functions for icons/colors.
 - Config and tooling
   - [package.json](../frontend/package.json): Scripts, dependencies.
   - [index.html](../frontend/index.html), [src/index.css](../frontend/src/index.css), [tailwind.config.js](../frontend/tailwind.config.js)

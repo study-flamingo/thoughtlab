@@ -1,6 +1,6 @@
 import pytest
 from app.services.graph_service import graph_service
-from app.models.nodes import ObservationCreate, RelationshipType
+from app.models.nodes import ObservationCreate
 
 
 @pytest.mark.asyncio
@@ -52,7 +52,7 @@ async def test_create_relationship(clean_neo4j):
     success = await graph_service.create_relationship(
         obs1_id,
         obs2_id,
-        RelationshipType.RELATES_TO,
+        "RELATES_TO",
         {"confidence": 0.9, "notes": "Test relationship"},
     )
     assert success is True
@@ -72,10 +72,10 @@ async def test_get_node_connections(clean_neo4j):
 
     # Create relationships
     await graph_service.create_relationship(
-        obs1_id, obs2_id, RelationshipType.RELATES_TO
+        obs1_id, obs2_id, "RELATES_TO"
     )
     await graph_service.create_relationship(
-        obs2_id, obs3_id, RelationshipType.SUPPORTS
+        obs2_id, obs3_id, "SUPPORTS"
     )
 
     # Get connections

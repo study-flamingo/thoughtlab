@@ -84,7 +84,7 @@ function App() {
           ) : selectedNodeId != null ? (
             <NodeInspector nodeId={selectedNodeId} onClose={() => setSelectedNodeId(null)} />
           ) : (
-            <ActivityFeed />
+            <ActivityFeed onSelectNode={handleNodeSelect} />
           )}
         </aside>
       </div>

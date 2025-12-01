@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.db.neo4j import neo4j_conn
 from app.db.redis import redis_conn
-from app.api.routes import nodes, graph, settings as settings_routes
+from app.api.routes import nodes, graph, settings as settings_routes, activities
 from typing import Callable, Awaitable
 
 
@@ -75,6 +75,7 @@ async def root():
 app.include_router(nodes.router, prefix="/api/v1")
 app.include_router(graph.router, prefix="/api/v1")
 app.include_router(settings_routes.router, prefix="/api/v1")
+app.include_router(activities.router, prefix="/api/v1")
 
 
 @app.get("/health")

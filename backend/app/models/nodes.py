@@ -1,7 +1,8 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from datetime import datetime
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, ClassVar
 from enum import Enum
+import re
 
 
 class NodeType(str, Enum):
@@ -10,16 +11,36 @@ class NodeType(str, Enum):
     HYPOTHESIS = "Hypothesis"
     CONCEPT = "Concept"
     ENTITY = "Entity"
+    CHUNK = "Chunk"
 
 
-class RelationshipType(str, Enum):
-    SUPPORTS = "SUPPORTS"
-    CONTRADICTS = "CONTRADICTS"
-    RELATES_TO = "RELATES_TO"
-    OBSERVED_IN = "OBSERVED_IN"
-    DISCUSSES = "DISCUSSES"
-    EXTRACTED_FROM = "EXTRACTED_FROM"
-    DERIVED_FROM = "DERIVED_FROM"
+# Suggested relationship types (open string, not enum-constrained)
+# LLM can create any relationship type; these are UI suggestions
+SUGGESTED_RELATIONSHIP_TYPES: List[str] = [
+    "SUPPORTS",
+    "CONTRADICTS",
+    "RELATES_TO",
+    "CITES",
+    "DERIVED_FROM",
+    "OBSERVED_IN",
+    "DISCUSSES",
+    "INSPIRED_BY",
+    "PRECEDES",
+    "CAUSES",
+    "PART_OF",
+    "SIMILAR_TO",
+    "HAS_CHUNK",
+]
+
+
+def normalize_relationship_type(value: str) -> str:
+    """Normalize relationship type to UPPER_SNAKE_CASE."""
+    # Replace spaces and hyphens with underscores
+    normalized = re.sub(r'[\s\-]+', '_', value.strip())
+    # Remove any non-alphanumeric characters except underscores
+    normalized = re.sub(r'[^A-Za-z0-9_]', '', normalized)
+    # Convert to uppercase
+    return normalized.upper()
 
 
 class LinkItem(BaseModel):
@@ -152,35 +173,93 @@ class ConceptResponse(NodeBase):
     type: str = "Concept"
 
 
+# -----------------------------------------------------------------------------
+# Chunk Model (for long-form content chunking)
+# -----------------------------------------------------------------------------
+
+class ChunkCreate(BaseModel):
+    """Create a chunk of content from a parent Source node."""
+    parent_id: str = Field(..., description="ID of the parent Source node")
+    content: str = Field(..., min_length=1, max_length=10000)
+    chunk_index: int = Field(..., ge=0, description="Position in parent document")
+    start_char: Optional[int] = Field(None, ge=0, description="Start character offset in parent")
+    end_char: Optional[int] = Field(None, ge=0, description="End character offset in parent")
+    metadata: Optional[Dict[str, Any]] = None
+
+
+class ChunkUpdate(BaseModel):
+    """Update an existing chunk."""
+    content: Optional[str] = Field(None, min_length=1, max_length=10000)
+    metadata: Optional[Dict[str, Any]] = None
+
+
+class ChunkResponse(NodeBase):
+    parent_id: str
+    content: str
+    chunk_index: int
+    start_char: Optional[int] = None
+    end_char: Optional[int] = None
+    metadata: Optional[Dict[str, Any]] = None
+    type: str = "Chunk"
+
+
+# -----------------------------------------------------------------------------
+# Relationship Models (open string types with suggestions)
+# -----------------------------------------------------------------------------
+
 class RelationshipCreate(BaseModel):
     from_id: str
     to_id: str
-    relationship_type: RelationshipType
+    relationship_type: str = Field(..., min_length=1, max_length=100)
     confidence: Optional[float] = Field(None, ge=0.0, le=1.0)
     notes: Optional[str] = None
+    # Authorship tracking
+    created_by: Optional[str] = Field(None, description="User ID or 'system-llm'")
     # Inverse relationship metadata for asymmetrical relationships when reversed
-    inverse_relationship_type: Optional[RelationshipType] = None
+    inverse_relationship_type: Optional[str] = Field(None, max_length=100)
     inverse_confidence: Optional[float] = Field(None, ge=0.0, le=1.0)
     inverse_notes: Optional[str] = None
+
+    @field_validator('relationship_type', 'inverse_relationship_type', mode='before')
+    @classmethod
+    def normalize_type(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return None
+        return normalize_relationship_type(v)
 
 
 class RelationshipUpdate(BaseModel):
     confidence: Optional[float] = Field(None, ge=0.0, le=1.0)
     notes: Optional[str] = None
-    relationship_type: Optional[RelationshipType] = None
-    inverse_relationship_type: Optional[RelationshipType] = None
+    relationship_type: Optional[str] = Field(None, max_length=100)
+    inverse_relationship_type: Optional[str] = Field(None, max_length=100)
     inverse_confidence: Optional[float] = Field(None, ge=0.0, le=1.0)
     inverse_notes: Optional[str] = None
+    # Feedback fields (for LLM-suggested relationships)
+    approved: Optional[bool] = Field(None, description="User has reviewed this relationship")
+    feedback_score: Optional[float] = Field(None, ge=0.0, le=1.0, description="User rating of suggestion quality")
+
+    @field_validator('relationship_type', 'inverse_relationship_type', mode='before')
+    @classmethod
+    def normalize_type(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return None
+        return normalize_relationship_type(v)
 
 
 class RelationshipResponse(BaseModel):
     id: str
     from_id: str
     to_id: str
-    relationship_type: RelationshipType
+    relationship_type: str
     confidence: Optional[float] = None
     notes: Optional[str] = None
-    inverse_relationship_type: Optional[RelationshipType] = None
+    # Authorship tracking
+    created_by: Optional[str] = None
+    approved: Optional[bool] = None
+    feedback_score: Optional[float] = None
+    # Inverse relationship
+    inverse_relationship_type: Optional[str] = None
     inverse_confidence: Optional[float] = None
     inverse_notes: Optional[str] = None
     created_at: Optional[datetime] = None
