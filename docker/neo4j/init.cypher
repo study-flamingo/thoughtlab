@@ -132,50 +132,60 @@ ON EACH [n.text, n.claim, n.title, n.name, n.description, n.content];
 // -----------------------------------------------------------------------------
 // SECTION 6: Vector Indexes (for semantic similarity search)
 // -----------------------------------------------------------------------------
-// NOTE: Create these AFTER populating embeddings, not at init time
 // Dimensions: 1536 for OpenAI text-embedding-3-small
-//
-// CREATE VECTOR INDEX observation_embedding IF NOT EXISTS
-// FOR (o:Observation) ON o.embedding
-// OPTIONS {indexConfig: {
-//   `vector.dimensions`: 1536,
-//   `vector.similarity_function`: 'cosine'
-// }};
-//
-// CREATE VECTOR INDEX hypothesis_embedding IF NOT EXISTS
-// FOR (h:Hypothesis) ON h.embedding
-// OPTIONS {indexConfig: {
-//   `vector.dimensions`: 1536,
-//   `vector.similarity_function`: 'cosine'
-// }};
-//
-// CREATE VECTOR INDEX source_embedding IF NOT EXISTS
-// FOR (s:Source) ON s.embedding
-// OPTIONS {indexConfig: {
-//   `vector.dimensions`: 1536,
-//   `vector.similarity_function`: 'cosine'
-// }};
-//
-// CREATE VECTOR INDEX concept_embedding IF NOT EXISTS
-// FOR (c:Concept) ON c.embedding
-// OPTIONS {indexConfig: {
-//   `vector.dimensions`: 1536,
-//   `vector.similarity_function`: 'cosine'
-// }};
-//
-// CREATE VECTOR INDEX entity_embedding IF NOT EXISTS
-// FOR (e:Entity) ON e.embedding
-// OPTIONS {indexConfig: {
-//   `vector.dimensions`: 1536,
-//   `vector.similarity_function`: 'cosine'
-// }};
-//
-// CREATE VECTOR INDEX chunk_embedding IF NOT EXISTS
-// FOR (ch:Chunk) ON ch.embedding
-// OPTIONS {indexConfig: {
-//   `vector.dimensions`: 1536,
-//   `vector.similarity_function`: 'cosine'
-// }};
+// These indexes enable the AI workflow to find similar content
+
+CREATE VECTOR INDEX observation_embedding IF NOT EXISTS
+FOR (o:Observation) ON o.embedding
+OPTIONS {indexConfig: {
+  `vector.dimensions`: 1536,
+  `vector.similarity_function`: 'cosine'
+}};
+
+CREATE VECTOR INDEX hypothesis_embedding IF NOT EXISTS
+FOR (h:Hypothesis) ON h.embedding
+OPTIONS {indexConfig: {
+  `vector.dimensions`: 1536,
+  `vector.similarity_function`: 'cosine'
+}};
+
+CREATE VECTOR INDEX source_embedding IF NOT EXISTS
+FOR (s:Source) ON s.embedding
+OPTIONS {indexConfig: {
+  `vector.dimensions`: 1536,
+  `vector.similarity_function`: 'cosine'
+}};
+
+CREATE VECTOR INDEX concept_embedding IF NOT EXISTS
+FOR (c:Concept) ON c.embedding
+OPTIONS {indexConfig: {
+  `vector.dimensions`: 1536,
+  `vector.similarity_function`: 'cosine'
+}};
+
+CREATE VECTOR INDEX entity_embedding IF NOT EXISTS
+FOR (e:Entity) ON e.embedding
+OPTIONS {indexConfig: {
+  `vector.dimensions`: 1536,
+  `vector.similarity_function`: 'cosine'
+}};
+
+CREATE VECTOR INDEX chunk_embedding IF NOT EXISTS
+FOR (ch:Chunk) ON ch.embedding
+OPTIONS {indexConfig: {
+  `vector.dimensions`: 1536,
+  `vector.similarity_function`: 'cosine'
+}};
+
+// Unified vector index for querying across all node types
+// This is used by the AI workflow's similarity search
+// Note: Neo4j 5.11+ supports this syntax
+CREATE VECTOR INDEX node_embedding IF NOT EXISTS
+FOR (n:Observation|Hypothesis|Source|Concept|Entity|Chunk) ON n.embedding
+OPTIONS {indexConfig: {
+  `vector.dimensions`: 1536,
+  `vector.similarity_function`: 'cosine'
+}};
 
 // -----------------------------------------------------------------------------
 // SECTION 7: System Data (LLM User Account)

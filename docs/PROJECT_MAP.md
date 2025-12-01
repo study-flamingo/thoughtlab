@@ -20,8 +20,14 @@ This document maps the repository’s structure, major components, and the respo
 - Services (domain logic)
   - [app/services/graph_service.py](../backend/app/services/graph_service.py): All Neo4j Cypher logic; create/update/read/delete nodes; create/update/delete relationships; `get_node_connections`; `get_full_graph`; settings management; JSON-safe conversions.
   - [app/services/activity_service.py](../backend/app/services/activity_service.py): Activity feed CRUD; suggestion approve/reject workflow; processing status tracking.
-  - [app/services/embedding_service.py](../backend/app/services/embedding_service.py): Embedding interface (stub for LangChain integration); vector storage in Neo4j.
-  - [app/services/processing_service.py](../backend/app/services/processing_service.py): Background processing orchestrator; chunking → embedding → analysis pipeline.
+  - [app/services/embedding_service.py](../backend/app/services/embedding_service.py): Legacy embedding interface (stub); see `app/ai/` for LangChain implementation.
+  - [app/services/processing_service.py](../backend/app/services/processing_service.py): Background processing orchestrator; delegates to AI workflow when configured.
+- AI Module (LangChain integration)
+  - [app/ai/config.py](../backend/app/ai/config.py): AI configuration settings (models, thresholds, API keys).
+  - [app/ai/embeddings.py](../backend/app/ai/embeddings.py): OpenAI embeddings via LangChain; Neo4j vector storage.
+  - [app/ai/similarity.py](../backend/app/ai/similarity.py): Vector similarity search using Neo4j indexes.
+  - [app/ai/classifier.py](../backend/app/ai/classifier.py): LLM-based relationship classification with structured output.
+  - [app/ai/workflow.py](../backend/app/ai/workflow.py): Main AI processing workflow; orchestrates chunking → embedding → similarity → classification → suggestions.
 - Utilities
   - [app/utils/chunking.py](../backend/app/utils/chunking.py): RecursiveCharacterSplitter for breaking long content into embeddable chunks.
 - Models (request/response DTOs, enums)
@@ -118,6 +124,7 @@ This document maps the repository’s structure, major components, and the respo
 | [01-PROJECT_OVERVIEW.md](./01-PROJECT_OVERVIEW.md) | Vision, features, scope, technical approach |
 | [02-ARCHITECTURE_DECISIONS.md](./02-ARCHITECTURE_DECISIONS.md) | ADRs for all technology choices |
 | [03-DEVELOPMENT_ROADMAP.md](./03-DEVELOPMENT_ROADMAP.md) | Completed phases + future features |
+| [langchain_implementation.md](./langchain_implementation.md) | LangChain + LangGraph AI integration plan |
 | [SETUP.md](./SETUP.md) | Installation and configuration |
 | [TESTING.md](./TESTING.md) | Backend + frontend testing |
 | [DEPENDENCIES.md](./DEPENDENCIES.md) | Package management with uv |

@@ -72,64 +72,124 @@ See [ADR-012: Development Principles](./02-ARCHITECTURE_DECISIONS.md#adr-012-dev
 
 ## In Progress
 
-### Phase 5: Embedding & Similarity
+### Phase 5: Activity Feed & Processing Infrastructure ✅
 
-**Goal**: Add semantic search for connection discovery.
+**Goal**: Interactive activity feed and background processing foundation.
+
+**Completed**:
+- [x] Activity data model and Neo4j schema
+- [x] ActivityService with CRUD operations
+- [x] Activity API routes (list, approve, reject)
+- [x] Interactive ActivityFeed component
+- [x] ProcessingService stub for workflow orchestration
+- [x] EmbeddingService stub interface
+- [x] RecursiveCharacterSplitter for chunking
+- [x] Comprehensive test coverage
+
+### Phase 6: LangChain + LangGraph AI Integration ✅
+
+**Goal**: AI-powered embedding generation and relationship discovery.
+
+> 📄 **Implementation Plan**: See [langchain_implementation.md](./langchain_implementation.md)
+
+**Completed**:
+- [x] Add LangChain dependencies (`langchain`, `langchain-openai`, `langchain-neo4j`, `langgraph`)
+- [x] Create `backend/app/ai/` module structure
+- [x] Implement `AIConfig` with `.env` configuration
+- [x] Implement `EmbeddingManager` with OpenAI embeddings
+- [x] Implement `SimilaritySearch` using Neo4j vector indexes
+- [x] Implement `RelationshipClassifier` with structured LLM output
+- [x] Implement `AIWorkflow` orchestrating the full pipeline
+- [x] Update `ProcessingService` to call AI workflow
+- [x] Enable Neo4j vector indexes
+
+**Remaining**:
+- [ ] Integration tests with mocked OpenAI
+- [ ] End-to-end tests with real API (optional)
+
+**Configuration**:
+```env
+THOUGHTLAB_OPENAI_API_KEY=sk-...
+THOUGHTLAB_LLM_MODEL=gpt-4o-mini
+THOUGHTLAB_EMBEDDING_MODEL=text-embedding-3-small
+```
+
+**Confidence Thresholds**:
+
+| Score | Action |
+|-------|--------|
+| ≥ 0.8 | Auto-create relationship |
+| 0.6-0.8 | Suggest to user |
+| < 0.6 | Discard |
+
+### Phase 7: ARQ Background Processing
+
+**Goal**: Non-blocking background job processing.
+
+> 📄 **Implementation Plan**: See [langchain_implementation.md](./langchain_implementation.md#arq-background-processing-upgrade)
 
 **Tasks**:
-- [ ] Install sentence-transformers
-- [ ] Create embedding service
-- [ ] Store embeddings in Neo4j vector index
-- [ ] Implement similarity search endpoint
-- [ ] Generate embeddings on node creation
-
-**Key Endpoints**:
-- `POST /api/v1/search/similar` — Find semantically similar nodes
-
-### Phase 6: LLM Integration
-
-**Goal**: AI-powered connection analysis.
-
-**Tasks**:
-- [ ] Configure LiteLLM for provider flexibility
-- [ ] Create LLM service for connection analysis
-- [ ] Implement analysis worker with ARQ
-- [ ] Auto-approve/needs-review/reject logic
-- [ ] Broadcast results via WebSocket
+- [ ] Add ARQ worker configuration
+- [ ] Create job definitions for node processing
+- [ ] Add worker service to Docker Compose
+- [ ] Update API routes to enqueue jobs
+- [ ] Monitor job status in Activity Feed
 
 ---
 
 ## Future Phases
 
-### Phase 7: Real-Time Updates
+### Phase 8: Real-Time Updates
 
 - WebSocket connection for live activity feed
 - Broadcast events on background task completion
 - Connection status indicator
 - Review queue for suggested connections
 
-### Phase 8: Feedback Loop & Learning
+### Phase 9: Feedback Loop & Learning
 
 - Store feedback in PostgreSQL
 - Track approval/rejection rates
 - Adjust confidence thresholds based on feedback
-- Analyze patterns in rejections
+- Analyze patterns in rejections (training data for future model improvements)
 
-### Phase 9: Natural Language Querying
+### Phase 10: Natural Language Querying
 
 - LLM interprets questions about the graph
-- Generates Cypher queries dynamically
+- Generates Cypher queries dynamically (GraphCypherQAChain)
 - Synthesizes answers from graph data
 - Examples: "What supports hypothesis X?", "Show gaps in topic Y"
 
-### Phase 10: User Authentication
+### Phase 11: User Authentication
 
-- FastAPI-Users integration
+- FastAPI-Users integration (OAuth 2.1 planned)
 - JWT token authentication
 - Multi-user support
 - Activity attribution per user
 
-### Phase 11: Polish & Performance
+### Phase 12: MCP Server
+
+**Goal**: Expose ThoughtLab tools via Model Context Protocol.
+
+> 📄 **Implementation Plan**: See [langchain_implementation.md](./langchain_implementation.md#mcp-server-integration)
+
+- Separate `mcp-server/` package
+- Thin wrapper tools calling ThoughtLab API
+- Compatible with Claude Desktop, Cursor, etc.
+- Publish to PyPI as `thoughtlab-mcp`
+
+### Phase 13: Chrome Extension
+
+**Goal**: Capture web content directly into the knowledge graph.
+
+> 📄 **Implementation Plan**: See [langchain_implementation.md](./langchain_implementation.md#chrome-extension)
+
+- Context menu: "Add as Observation", "Save Page as Source"
+- Popup with recent activity and quick search
+- Optional sidebar with graph view
+- Publish to Chrome Web Store
+
+### Phase 14: Polish & Performance
 
 - Comprehensive error handling
 - Optimized loading states
@@ -142,6 +202,7 @@ See [ADR-012: Development Principles](./02-ARCHITECTURE_DECISIONS.md#adr-012-dev
 
 Features not yet scheduled:
 
+### Graph Features
 - **Graph Filtering**: Filter by node type, time range, confidence
 - **Graph Search**: Search nodes by text within visualization
 - **Layout Switching**: Toggle between force-directed, hierarchical, circular
@@ -150,6 +211,13 @@ Features not yet scheduled:
 - **Export**: Export graph as JSON or image
 - **Batch Operations**: Create multiple nodes/relationships at once
 - **Import**: Import data from external sources
+
+### Additional Integrations
+- **CLI Tool**: Command-line interface for ThoughtLab operations
+- **Slack Bot**: Add observations and query graph from Slack
+- **Obsidian Plugin**: Sync with Obsidian vault
+- **VS Code Extension**: Quick capture while coding
+- **API Webhooks**: Trigger actions on graph changes
 
 ---
 

@@ -953,8 +953,14 @@ class GraphService:
                     node_labels = list(record["connected"].labels)
                     node_data["type"] = node_labels[0] if node_labels else "Unknown"
 
+                    # Convert relationship data to JSON-safe format
+                    rels_data = [
+                        {k: GraphService._json_safe(v, k) for k, v in dict(r).items()}
+                        for r in record["rels"]
+                    ]
+
                     connections.append(
-                        {"node": node_data, "relationships": [dict(r) for r in record["rels"]]}
+                        {"node": node_data, "relationships": rels_data}
                     )
 
             return connections

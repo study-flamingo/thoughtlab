@@ -168,7 +168,7 @@ class ActivityService:
 
         if not filter.include_dismissed:
             # Exclude rejected and expired by default
-            conditions.append("(a.status IS NULL OR a.status NOT IN ['rejected', 'expired'])")
+            conditions.append("(a.status IS NULL OR NOT a.status IN ['rejected', 'expired'])")
 
         where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
 

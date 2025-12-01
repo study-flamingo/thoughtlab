@@ -40,6 +40,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Activity TypeScript types (`frontend/src/types/activity.ts`)
 - API service methods for activity operations
 
+#### AI Integration (LangChain + LangGraph)
+- **AI Module** (`backend/app/ai/`) - Complete LangChain integration:
+  - `config.py` - AI configuration with env var support (`THOUGHTLAB_OPENAI_API_KEY`, models, thresholds)
+  - `embeddings.py` - OpenAI embeddings via LangChain with Neo4j storage
+  - `similarity.py` - Vector similarity search using Neo4j vector indexes
+  - `classifier.py` - LLM-based relationship classification with structured Pydantic output
+  - `workflow.py` - Main AI processing workflow orchestrator
+- **Processing Service Update** - Delegates to AI workflow when configured
+- **Neo4j Vector Indexes** - Added to `init.cypher` for all node types
+- **Dependencies** - Added `langchain`, `langchain-openai`, `langchain-neo4j`, `langgraph`
+
+#### Documentation
+- **LangChain Implementation Plan** (`docs/langchain_implementation.md`) - Comprehensive guide for AI integration:
+  - **Unified Tool Architecture** - Shared tool layer for LangGraph, MCP, and frontend
+  - **LangGraph vs LangChain decision** - Why LangGraph for intelligent workflows
+  - Architecture diagrams for processing workflow
+  - Module structure for `backend/app/ai/` and `backend/app/tools/` packages
+  - Component implementations (embeddings, similarity, classifier, workflow)
+  - Configuration via `.env` file
+  - ARQ background processing upgrade plan
+  - **MCP Server plan** - Companion server for Claude Desktop integration
+  - **Chrome Extension plan** - Quick capture from web pages
+  - Testing strategy for AI components
+- **SETUP.md** - Added AI configuration section with environment variables and thresholds
+- **PROJECT_MAP.md** - Added AI module documentation
+
 #### Test Coverage
 - **Test runner script** (`test.sh`) - Unified test runner for both frontend and backend
   - `./test.sh` - Run all tests
@@ -157,7 +183,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 | 0.1.0 | Project setup | ✅ Complete |
 | 0.2.0 | Backend + Frontend foundation | ✅ Complete |
 | 0.3.0 | Node types, relationships, settings | 🚧 In Progress |
-| 0.4.0 | AI Integration (LangChain + OpenAI) | 📋 Planned |
+| 0.4.0 | AI Integration (LangChain + OpenAI) | 🚧 In Progress |
 | 0.5.0 | Vector embeddings + semantic search | 📋 Planned |
 | 0.6.0 | Connection discovery workflows | 📋 Planned |
 | 1.0.0 | Production-ready release | 📋 Planned |
@@ -167,10 +193,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Upcoming Milestones
 
 ### 0.4.0 - AI Integration
-- [ ] LangChain integration for LLM calls
-- [ ] OpenAI configuration and API setup
-- [ ] Connection analysis service
-- [ ] Relationship classification
+- [x] LangChain integration for LLM calls
+- [x] OpenAI configuration and API setup
+- [x] Connection analysis service (similarity search)
+- [x] Relationship classification (LLM with structured output)
+- [ ] Integration tests with mocked OpenAI
+- [ ] End-to-end tests with real API (optional)
 
 ### 0.5.0 - Vector Search
 - [ ] Neo4j vector indexes for all node types

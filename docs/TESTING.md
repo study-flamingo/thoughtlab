@@ -33,8 +33,11 @@ pytest --cov=app --cov-report=html  # With coverage
 | File | Purpose |
 |------|---------|
 | `tests/test_api_nodes.py` | API endpoint integration tests |
+| `tests/test_api_activities.py` | Activity feed API tests |
 | `tests/test_graph_service.py` | Service layer unit tests |
-| `tests/test_models.py` | Pydantic model validation |
+| `tests/test_activity_service.py` | Activity service unit tests |
+| `tests/test_activity_models.py` | Activity model validation |
+| `tests/test_models.py` | Node/relationship model validation |
 | `tests/conftest.py` | Shared fixtures |
 
 ### Fixtures

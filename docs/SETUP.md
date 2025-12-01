@@ -46,7 +46,7 @@ uv pip install -r requirements.txt
 # Configure environment
 cp .env.example .env
 # Edit .env: add SECRET_KEY (generate with: python -c "import secrets; print(secrets.token_urlsafe(32))")
-# Edit .env: add OPENAI_API_KEY if using OpenAI
+# Edit .env: add THOUGHTLAB_OPENAI_API_KEY for AI features (see AI Configuration below)
 ```
 
 ### 3. Frontend Setup
@@ -128,6 +128,52 @@ From project root:
 **Python not found**: Use `python3` instead of `python`
 
 **uv not found**: Restart terminal after installation, or add `~/.cargo/bin` to PATH
+
+---
+
+## AI Configuration
+
+ThoughtLab uses LangChain and OpenAI for AI-powered features:
+- **Embedding Generation**: Converts node content to vector embeddings
+- **Similarity Search**: Finds related content using Neo4j vector indexes
+- **Relationship Classification**: Uses LLM to identify relationship types
+- **Automated Suggestions**: Creates relationship suggestions based on confidence
+
+### Required Environment Variables
+
+```bash
+# OpenAI API Key (required for AI features)
+THOUGHTLAB_OPENAI_API_KEY=sk-your-openai-api-key
+```
+
+Get your API key at: https://platform.openai.com/api-keys
+
+### Optional Configuration
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `THOUGHTLAB_LLM_MODEL` | `gpt-4o-mini` | LLM model for classification |
+| `THOUGHTLAB_EMBEDDING_MODEL` | `text-embedding-3-small` | Embedding model |
+| `THOUGHTLAB_EMBEDDING_DIMENSIONS` | `1536` | Embedding vector size |
+| `THOUGHTLAB_AUTO_CREATE_THRESHOLD` | `0.8` | Auto-create relationships above this confidence |
+| `THOUGHTLAB_SUGGEST_THRESHOLD` | `0.6` | Create suggestions above this confidence |
+| `THOUGHTLAB_SIMILARITY_MIN_SCORE` | `0.5` | Minimum similarity for candidates |
+| `THOUGHTLAB_MAX_SIMILAR_NODES` | `20` | Max candidates to analyze |
+
+### Confidence Thresholds
+
+| Confidence | Action |
+|------------|--------|
+| ≥ 0.8 | Auto-create relationship (marked as `created_by: system-llm`) |
+| 0.6 - 0.8 | Create suggestion in Activity Feed for user review |
+| < 0.6 | Discard silently |
+
+### Without AI Configuration
+
+If `THOUGHTLAB_OPENAI_API_KEY` is not set, ThoughtLab works normally but:
+- No automatic embedding generation
+- No AI-powered relationship suggestions
+- Manual relationship creation only
 
 ---
 

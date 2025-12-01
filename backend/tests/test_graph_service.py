@@ -49,13 +49,15 @@ async def test_create_relationship(clean_neo4j):
     obs2_id = await graph_service.create_observation(obs2_data)
 
     # Create relationship
-    success = await graph_service.create_relationship(
+    rel_id = await graph_service.create_relationship(
         obs1_id,
         obs2_id,
         "RELATES_TO",
         {"confidence": 0.9, "notes": "Test relationship"},
     )
-    assert success is True
+    # create_relationship returns the relationship ID (string) on success, None on failure
+    assert rel_id is not None
+    assert isinstance(rel_id, str)
 
 
 @pytest.mark.asyncio

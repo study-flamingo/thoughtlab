@@ -13,6 +13,9 @@ The workflow is designed to:
 - Update activity feed with progress
 - Handle failures gracefully
 - Support future ARQ background job integration
+
+NOTE: This service now delegates to the AI workflow (app.ai.workflow) when AI
+is configured. The legacy stub implementation is preserved for fallback.
 """
 
 from typing import Optional, Dict, Any, List
@@ -47,6 +50,15 @@ class ProcessingResult:
     suggestions_found: int = 0
     auto_created_relationships: int = 0
     error: Optional[str] = None
+
+
+def _is_ai_workflow_ready() -> bool:
+    """Check if AI workflow is ready to use."""
+    try:
+        from app.ai.config import get_ai_config
+        return get_ai_config().is_configured
+    except Exception:
+        return False
 
 
 class ProcessingService:
@@ -480,6 +492,10 @@ async def trigger_node_processing(
     This is the function that should be called after node creation.
     Currently runs synchronously, but will be wrapped in ARQ job later.
     
+    When AI is configured (THOUGHTLAB_OPENAI_API_KEY set), this delegates
+    to the AI workflow for full LangChain-powered processing. Otherwise,
+    it falls back to the legacy stub implementation.
+    
     Usage:
         # After creating a node
         result = await trigger_node_processing(
@@ -489,6 +505,34 @@ async def trigger_node_processing(
             node_label=observation_text[:50],
         )
     """
+    # Use AI workflow if configured
+    if _is_ai_workflow_ready():
+        from app.ai.workflow import trigger_ai_processing, ProcessingResult as AIResult
+        
+        ai_result = await trigger_ai_processing(
+            node_id=node_id,
+            node_type=node_type,
+            content=content,
+            node_label=node_label,
+        )
+        
+        # Convert AI result to legacy format
+        return ProcessingResult(
+            node_id=ai_result.node_id,
+            node_type=ai_result.node_type,
+            success=ai_result.success,
+            chunks_created=ai_result.chunks_created,
+            embeddings_created=ai_result.embeddings_created,
+            suggestions_found=ai_result.suggestions_created,
+            auto_created_relationships=ai_result.auto_created_relationships,
+            error=ai_result.error,
+        )
+    
+    # Fall back to legacy stub implementation
+    logger.info(
+        "AI not configured, using legacy processing stub. "
+        "Set THOUGHTLAB_OPENAI_API_KEY for full AI processing."
+    )
     return await processing_service.process_node(
         node_id=node_id,
         node_type=node_type,

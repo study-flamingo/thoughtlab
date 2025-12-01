@@ -1,6 +1,9 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from typing import List
+from typing import List, Optional, TYPE_CHECKING
 from functools import lru_cache
+
+if TYPE_CHECKING:
+    from app.ai.config import AIConfig
 
 
 class Settings(BaseSettings):
@@ -22,13 +25,28 @@ class Settings(BaseSettings):
         "http://localhost:3000",
     ]
     
-    # LLM
+    # LLM (legacy - use AIConfig for new AI features)
     openai_api_key: str = ""
     anthropic_api_key: str = ""
     model_config = SettingsConfigDict(
         env_file=".env",
         case_sensitive=False,
     )
+    
+    @property
+    def ai_config(self) -> "AIConfig":
+        """Get AI configuration.
+        
+        Provides access to AI-specific settings like embedding models,
+        LLM configuration, and confidence thresholds.
+        """
+        from app.ai.config import get_ai_config
+        return get_ai_config()
+    
+    @property
+    def is_ai_enabled(self) -> bool:
+        """Check if AI features are enabled (API key configured)."""
+        return self.ai_config.is_configured
 
 
 @lru_cache

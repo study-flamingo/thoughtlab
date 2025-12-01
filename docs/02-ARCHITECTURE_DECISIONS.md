@@ -17,7 +17,9 @@ This document captures the technical architecture for the Research Connection Gr
 | Background Jobs | ARQ (Redis) | Async-native, matches FastAPI patterns |
 | Real-Time | FastAPI WebSocket | Zero dependencies, bi-directional |
 | Authentication | FastAPI-Users + JWT 🔄 | Self-hosted, async-compatible |
-| LLM & Embeddings | LangChain + OpenAI 🔄 | Unified AI layer, hybrid graph+vector queries |
+| AI Workflows | LangGraph | Intelligent tool selection, multi-step reasoning |
+| AI Primitives | LangChain + OpenAI 🔄 | Embeddings, LLM calls, Neo4j integration |
+| Tool Architecture | Unified tool layer | Single source of truth for all interfaces |
 | Frontend Framework | React + TypeScript + Vite | Ecosystem, type safety, fast builds |
 | Graph Visualization | Cytoscape.js | Purpose-built, layout algorithms |
 
@@ -111,22 +113,65 @@ CREATE INDEX rel_id_relates IF NOT EXISTS FOR ()-[r:RELATES_TO]-() ON (r.id);
 
 ## AI & Machine Learning
 
-### LangChain + OpenAI
+### LangGraph + LangChain + OpenAI
 
-**Decision:** Use **LangChain** as the unified AI framework with **OpenAI** as the provider for both LLM chat/completion and embeddings. Vector embeddings stored in Neo4j's native vector indexes.
+**Decision:** Use **LangGraph** for intelligent workflows, **LangChain** for AI primitives, and **OpenAI** as the provider. Vector embeddings stored in Neo4j's native vector indexes.
 
-**What LangChain Handles:**
+> 📄 **Implementation Details**: See [langchain_implementation.md](./langchain_implementation.md)
+
+**Framework Roles:**
+
+| Framework | Role | Use Case |
+|-----------|------|----------|
+| **LangGraph** | Workflow orchestration | Multi-step reasoning, tool selection, branching logic |
+| **LangChain** | AI primitives | Embeddings, LLM calls, Neo4j integration |
+| **OpenAI** | Model provider | GPT-4o-mini (chat), text-embedding-3-small (vectors) |
+
+**Why LangGraph over LangChain alone:**
+- **Intelligent tool selection** — Agent decides which tools to invoke
+- **Complex workflows** — Multi-step: embed → search → classify → decide
+- **Branching logic** — Auto-create vs suggest vs discard based on confidence
+- **Human-in-the-loop** — Interrupt workflows for approval at any point
+- **State management** — Persistent context across conversation turns
+- **MCP compatibility** — Same tools exposable via Model Context Protocol
+
+### Unified Tool Architecture
+
+**Decision:** Create a shared **tool layer** that can be invoked by LangGraph agents, MCP server, and frontend.
+
+**Why:**
+- **Single source of truth** — Logic in one place, not duplicated
+- **Consistent behavior** — Same validation everywhere
+- **Easy testing** — Test tools once
+- **Extensibility** — Add CLI, Slack bot, etc. without rewriting logic
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    TOOL LAYER (Core Logic)                   │
+│   create_node │ search_similar │ classify_rel │ query_graph  │
+└─────────────────────────────────────────────────────────────┘
+                              │
+         ┌────────────────────┼────────────────────┐
+         ▼                    ▼                    ▼
+   ┌──────────┐        ┌──────────┐        ┌──────────┐
+   │ LangGraph│        │   MCP    │        │ Frontend │
+   │  Agent   │        │  Server  │        │   API    │
+   └──────────┘        └──────────┘        └──────────┘
+```
+
+### OpenAI Configuration
 
 | Capability | OpenAI Model | Use Case |
 |------------|--------------|----------|
 | Chat/Completion | `gpt-4o` / `gpt-4o-mini` | Connection analysis, relationship classification |
 | Embeddings | `text-embedding-3-small` | Semantic similarity search |
 
-**Why LangChain + OpenAI:**
-- **Unified framework** — Single library for LLM calls, embeddings, and retrieval
-- **LangGraph ready** — Natural progression to agent workflows when needed
-- **OpenAI quality** — Best-in-class models for both reasoning and embeddings
-- **Neo4j integration** — `Neo4jVector` store enables hybrid graph+vector queries
+**Why OpenAI:**
+- **Quality** — Best-in-class models for both reasoning and embeddings
+- **Reliability** — Consistent API, good uptime
+- **LangChain integration** — First-class support via `langchain-openai`
+
+> **🔄 INTERIM DECISION:** Currently hardcoded to OpenAI. Future work will add provider selection via settings.
 
 **Hybrid Query Power:**
 
