@@ -68,10 +68,6 @@ See [ADR-012: Development Principles](./02-ARCHITECTURE_DECISIONS.md#adr-012-dev
 - Settings modal (theme, layout, colors)
 - Activity feed placeholder
 
----
-
-## In Progress
-
 ### Phase 5: Activity Feed & Processing Infrastructure ✅
 
 **Goal**: Interactive activity feed and background processing foundation.
@@ -81,8 +77,8 @@ See [ADR-012: Development Principles](./02-ARCHITECTURE_DECISIONS.md#adr-012-dev
 - [x] ActivityService with CRUD operations
 - [x] Activity API routes (list, approve, reject)
 - [x] Interactive ActivityFeed component
-- [x] ProcessingService stub for workflow orchestration
-- [x] EmbeddingService stub interface
+- [x] ProcessingService for workflow orchestration
+- [x] EmbeddingService interface
 - [x] RecursiveCharacterSplitter for chunking
 - [x] Comprehensive test coverage
 
@@ -103,9 +99,7 @@ See [ADR-012: Development Principles](./02-ARCHITECTURE_DECISIONS.md#adr-012-dev
 - [x] Update `ProcessingService` to call AI workflow
 - [x] Enable Neo4j vector indexes
 
-**Remaining**:
-- [ ] Integration tests with mocked OpenAI
-- [ ] End-to-end tests with real API (optional)
+**Note**: Integration tests with mocked OpenAI and end-to-end tests are optional future enhancements.
 
 **Configuration**:
 ```env
@@ -121,6 +115,10 @@ THOUGHTLAB_EMBEDDING_MODEL=text-embedding-3-small
 | ≥ 0.8 | Auto-create relationship |
 | 0.6-0.8 | Suggest to user |
 | < 0.6 | Discard |
+
+---
+
+## In Progress
 
 ### Phase 7: ARQ Background Processing
 

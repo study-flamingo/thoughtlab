@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+No unreleased changes.
+
+---
+
+## [0.2.0-alpha] - 2025-11-30
+
+This alpha release includes the complete Activity Feed system, background processing infrastructure, and LangChain/LangGraph AI integration (Phases 5-6 from the roadmap).
+
 ### Added
 
 #### Activity Feed System
@@ -113,29 +121,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [0.3.0] - 2024-XX-XX (Current Development)
-
-### Added
-- Link management for nodes (clickable URLs across all node types)
-- Entity node type with full CRUD operations
-- Concept node type with full CRUD operations
-- Source node type with full CRUD operations
-- Relationship management endpoints (create, update, delete)
-- Relation styles customization in settings
-- Node color customization per type
-- Dark mode support across all components
-- Retry logic for service connections
-- Health check mechanisms with proper error handling
-
-### Changed
-- Settings management refactored with relation styles and node colors
-- GraphVisualizer uses dynamic styles from user preferences
-- API service methods improved for better settings handling
-- Docker configuration refined
-
----
-
-## [0.2.0] - Foundation Release
+## [0.2.0] - 2024-XX-XX - Foundation Release
 
 ### Added
 - **Backend Foundation**
@@ -182,39 +168,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 |---------|-------|--------|
 | 0.1.0 | Project setup | ✅ Complete |
 | 0.2.0 | Backend + Frontend foundation | ✅ Complete |
-| 0.3.0 | Node types, relationships, settings | 🚧 In Progress |
-| 0.4.0 | AI Integration (LangChain + OpenAI) | 🚧 In Progress |
-| 0.5.0 | Vector embeddings + semantic search | 📋 Planned |
-| 0.6.0 | Connection discovery workflows | 📋 Planned |
+| 0.2.0-alpha | Activity Feed + AI Integration (Phases 5-6) | ✅ Complete |
+| 0.3.0 | ARQ Background Processing (Phase 7) | 📋 Planned |
+| 0.4.0 | Real-time Updates (Phase 8) | 📋 Planned |
 | 1.0.0 | Production-ready release | 📋 Planned |
 
 ---
 
 ## Upcoming Milestones
 
-### 0.4.0 - AI Integration
-- [x] LangChain integration for LLM calls
-- [x] OpenAI configuration and API setup
-- [x] Connection analysis service (similarity search)
-- [x] Relationship classification (LLM with structured output)
+### 0.3.0 - ARQ Background Processing (Phase 7)
+- [ ] Add ARQ worker configuration
+- [ ] Create job definitions for node processing
+- [ ] Add worker service to Docker Compose
+- [ ] Update API routes to enqueue jobs
+- [ ] Monitor job status in Activity Feed
+
+### 0.4.0 - Real-time Updates (Phase 8)
+- [ ] WebSocket connection for live activity feed
+- [ ] Broadcast events on background task completion
+- [ ] Connection status indicator
+- [ ] Review queue for suggested connections
+
+### Future Enhancements
 - [ ] Integration tests with mocked OpenAI
 - [ ] End-to-end tests with real API (optional)
-
-### 0.5.0 - Vector Search
-- [ ] Neo4j vector indexes for all node types
-- [ ] OpenAI embeddings via LangChain
-- [ ] Embedding service implementation
-- [ ] Similarity search API endpoints
-- [ ] Hybrid graph+vector queries
-
-### 0.6.0 - Discovery Workflows
-- [ ] Background job processing (ARQ)
-- [ ] Automatic connection suggestions
-- [ ] User feedback collection
-- [ ] Activity feed real-time updates (WebSocket)
+- [ ] Natural language querying (Phase 10)
+- [ ] User authentication (Phase 11)
+- [ ] MCP Server (Phase 12)
+- [ ] Chrome Extension (Phase 13)
 
 [Unreleased]: https://github.com/study-flamingo/thoughtlab/compare/main...HEAD
-[0.3.0]: https://github.com/study-flamingo/thoughtlab/compare/v0.2.0...main
+[0.2.0-alpha]: https://github.com/study-flamingo/thoughtlab/compare/v0.2.0...main
 [0.2.0]: https://github.com/study-flamingo/thoughtlab/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/study-flamingo/thoughtlab/releases/tag/v0.1.0
 
