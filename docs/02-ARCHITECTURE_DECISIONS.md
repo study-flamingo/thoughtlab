@@ -14,7 +14,8 @@ This document captures the technical architecture for the Research Connection Gr
 | Relational Database | PostgreSQL | Users, logs, settings; battle-tested |
 | Identifiers | UUIDv4 strings | Portable, stable across export/import |
 | Backend Framework | FastAPI | Async-native, auto-docs, WebSocket built-in |
-| Background Jobs | ARQ (Redis) | Async-native, matches FastAPI patterns |
+| Background Jobs | Deferred (ARQ when needed) | Sync processing acceptable; optimize when proven necessary |
+| LLM Operations | Tool-based architecture | LLM agents call graph operations via unified tool layer |
 | Real-Time | FastAPI WebSocket | Zero dependencies, bi-directional |
 | Authentication | FastAPI-Users + JWT 🔄 | Self-hosted, async-compatible |
 | AI Workflows | LangGraph | Intelligent tool selection, multi-step reasoning |
@@ -287,30 +288,91 @@ OPTIONS {indexConfig: {`vector.dimensions`: 384, `vector.similarity_function`: '
 
 ---
 
-### Background Processing: ARQ
+### Background Processing: Deferred (ARQ when needed)
 
-**Decision:** Use ARQ (Async Redis Queue) for background job processing.
+**Decision:** Defer background job infrastructure until proven necessary by real-world usage data.
 
-**Why ARQ:**
-- Async-native — Matches FastAPI perfectly
-- Redis-backed — Already using Redis
-- Simple — Easy to set up, lightweight
-- Reliable — Job persistence, retries, timeouts built-in
+**Current State:** Synchronous AI processing (3-5 seconds per node) is acceptable for single-user research workflows.
 
-**Use Cases:**
-- LLM analysis of connections (shouldn't block API)
-- Embedding generation for new nodes
-- Batch processing operations
+**Rationale:**
+- YAGNI principle — Don't build infrastructure before proving need
+- Current performance is acceptable — No user complaints or bottlenecks
+- Optimize for capability over scale — Focus on making AI smarter, not faster
+- Design with data — Measure real-world performance before optimization
+
+**Decision Criteria** — Implement ARQ/Celery when:
+- API timeouts during node creation become common
+- Processing time exceeds 10 seconds regularly
+- Multi-user deployments show resource contention
+- Batch operations needed (re-analyze entire graph)
+- Performance monitoring shows clear bottleneck
+
+**When Implemented (Future):**
+- *Primary choice:* ARQ (async-native, Redis-backed, simple)
+- *Alternative:* Celery (if more mature tooling needed)
+- *Implementation:* Worker service, job definitions, retry logic
 
 **Trade-offs:**
-- ✅ Jobs survive server restarts
-- ✅ Configurable retries/timeouts
-- ⚠️ Smaller community than Celery
-- ⚠️ Fewer monitoring tools
+- ✅ Simpler codebase now — Fewer moving parts to maintain
+- ✅ Easier debugging — Synchronous flows easier to trace
+- ✅ Better design later — Queue system designed around actual needs
+- ⚠️ May need refactoring if scale issues emerge
 
-**Alternatives Rejected:**
-- *Celery* — Not async-native, heavier weight
-- *FastAPI Background Tasks* — No persistence, can't survive restarts
+---
+
+### LLM-Powered Graph Operations
+
+**Decision:** Build a unified tool layer enabling LLM agents to intelligently operate on the knowledge graph via tool calls.
+
+**Why Tool-Based Architecture:**
+- User control — Manual operations (find related, summarize, merge nodes)
+- AI automation — LLM agents can call tools based on natural language intent
+- Single source of truth — Same logic for LLM, API, frontend, future MCP server
+- Composability — Tools can chain together for complex workflows
+- Safety — Destructive operations require explicit user confirmation
+
+**Key Capabilities:**
+
+*Node Operations:*
+- Find and link semantically related nodes
+- Recalculate confidence based on graph context
+- Generate LLM summaries (with/without relationship context)
+- Search web for supporting/contradicting evidence
+- Reclassify node types
+
+*Edge Operations:*
+- Recalculate relationship confidence
+- Reclassify relationship types
+- Explain connections in plain language
+- Merge duplicate/similar nodes (with confirmation)
+
+**Safety Model:**
+- All destructive operations (delete, merge) require user confirmation
+- LLM receives feedback about user approval/denial
+- Comprehensive audit trail in Activity Feed
+- No silent data loss
+
+**Architecture Layers:**
+
+| Layer | Responsibility |
+|-------|----------------|
+| LangGraph Agent | Natural language → tool selection |
+| Tool Layer | Shared business logic (node ops, edge ops) |
+| Services | GraphService, AI workflows, database |
+| Database | Neo4j (graph + vectors) + PostgreSQL (users, logs) |
+
+**Trade-offs:**
+- ✅ Powerful user-controlled operations
+- ✅ Foundation for future LLM autonomy
+- ✅ Reusable across interfaces (API, MCP, CLI)
+- ✅ Clear safety boundaries
+- ⚠️ More complex than simple CRUD
+- ⚠️ Requires thoughtful UX for confirmations
+
+**Why This Over Background Jobs:**
+- More valuable to users — Direct manipulation beats faster automation
+- Learn actual usage patterns — Inform future optimization decisions
+- Capabilities before scale — Build features users want first
 
 ---
 

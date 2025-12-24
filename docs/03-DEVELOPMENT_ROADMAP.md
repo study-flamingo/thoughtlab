@@ -70,51 +70,21 @@ See [ADR-012: Development Principles](./02-ARCHITECTURE_DECISIONS.md#adr-012-dev
 
 ### Phase 5: Activity Feed & Processing Infrastructure ✅
 
-**Goal**: Interactive activity feed and background processing foundation.
+**Goal**: Track system events and provide foundation for background processing.
 
-**Completed**:
-- [x] Activity data model and Neo4j schema
-- [x] ActivityService with CRUD operations
-- [x] Activity API routes (list, approve, reject)
-- [x] Interactive ActivityFeed component
-- [x] ProcessingService for workflow orchestration
-- [x] EmbeddingService interface
-- [x] RecursiveCharacterSplitter for chunking
-- [x] Comprehensive test coverage
+**Completed**: Activity data model, ActivityService with CRUD, interactive ActivityFeed component, ProcessingService orchestration, chunking utilities, comprehensive test coverage
 
 ### Phase 6: LangChain + LangGraph AI Integration ✅
 
 **Goal**: AI-powered embedding generation and relationship discovery.
 
-> 📄 **Implementation Plan**: See [langchain_implementation.md](./langchain_implementation.md)
+**Completed**: LangChain/LangGraph dependencies, AI module (config, embeddings, similarity search, relationship classifier), AI workflow orchestration, Neo4j vector indexes
 
-**Completed**:
-- [x] Add LangChain dependencies (`langchain`, `langchain-openai`, `langchain-neo4j`, `langgraph`)
-- [x] Create `backend/app/ai/` module structure
-- [x] Implement `AIConfig` with `.env` configuration
-- [x] Implement `EmbeddingManager` with OpenAI embeddings
-- [x] Implement `SimilaritySearch` using Neo4j vector indexes
-- [x] Implement `RelationshipClassifier` with structured LLM output
-- [x] Implement `AIWorkflow` orchestrating the full pipeline
-- [x] Update `ProcessingService` to call AI workflow
-- [x] Enable Neo4j vector indexes
+**How It Works**:
+- New nodes → Generate embeddings → Find similar nodes → LLM classifies relationships
+- Confidence ≥0.8: auto-create | 0.6-0.8: suggest to user | <0.6: discard
 
-**Note**: Integration tests with mocked OpenAI and end-to-end tests are optional future enhancements.
-
-**Configuration**:
-```env
-THOUGHTLAB_OPENAI_API_KEY=sk-...
-THOUGHTLAB_LLM_MODEL=gpt-4o-mini
-THOUGHTLAB_EMBEDDING_MODEL=text-embedding-3-small
-```
-
-**Confidence Thresholds**:
-
-| Score | Action |
-|-------|--------|
-| ≥ 0.8 | Auto-create relationship |
-| 0.6-0.8 | Suggest to user |
-| < 0.6 | Discard |
+> 📄 **Details**: [02-ARCHITECTURE_DECISIONS.md](./02-ARCHITECTURE_DECISIONS.md#langgraph--langchain--openai)
 
 ---
 
@@ -122,133 +92,61 @@ THOUGHTLAB_EMBEDDING_MODEL=text-embedding-3-small
 
 ### Phase 7: LLM-Powered Graph Operations
 
-**Goal**: Unified tool layer enabling LLM agents to intelligently operate on the knowledge graph.
+**Goal**: Enable LLM agents to intelligently manipulate the knowledge graph through natural language.
 
-> 📄 **Architecture**: See [TOOL_ARCHITECTURE.md](./TOOL_ARCHITECTURE.md)
+> 📄 **Detailed Architecture**: [02-ARCHITECTURE_DECISIONS.md](./02-ARCHITECTURE_DECISIONS.md#llm-powered-graph-operations)
+> 📄 **Technical Specification**: [TOOL_ARCHITECTURE.md](./TOOL_ARCHITECTURE.md)
 
-**Design Decision**: Rather than adding background job infrastructure (ARQ), we're focusing on making the existing AI capabilities more powerful and user-controlled through a tool-based architecture. This allows LLM agents to perform complex graph operations via tool calls.
+**Approach**: Build a unified tool layer where LLMs can perform graph operations via function calls, rather than adding background job infrastructure (deferred until proven necessary).
 
-**Key Capabilities**:
+**Core Capabilities**:
 
-**Node Operations**:
-- [ ] Find and link related nodes (semantic search + auto-linking)
-- [ ] Recalculate confidence (context-aware re-analysis)
-- [ ] Summarize node (LLM-generated summary)
-- [ ] Summarize with context (include relationships)
-- [ ] Search web for evidence (supporting/contradicting)
-- [ ] Reclassify node type (Observation → Hypothesis, etc.)
+- **Node Operations**: Find related nodes, recalculate confidence, generate summaries, search web for evidence, reclassify types
+- **Edge Operations**: Recalculate relationship strength, reclassify types, explain connections, merge duplicate nodes
+- **Safety**: All destructive operations require user confirmation with feedback to LLM
+- **Interface**: Natural language commands translated to tool calls via LangGraph agent
 
-**Edge Operations**:
-- [ ] Recalculate relationship confidence
-- [ ] Reclassify relationship type
-- [ ] Summarize relationship (explain connection)
-- [ ] Merge related nodes (with confirmation)
-
-**Infrastructure**:
-- [ ] Tool layer architecture (`backend/app/tools/`)
-- [ ] Tool registration and discovery system
-- [ ] User confirmation system for destructive operations
-- [ ] Activity feed integration for tool execution
-- [ ] LangGraph agent for natural language tool selection
-
-**Safety**:
-- All destructive operations (delete, merge) require user confirmation
-- LLM receives feedback about user approval/denial decisions
-- Comprehensive audit trail in Activity Feed
-
-**Implementation Phases**:
-1. Core tool infrastructure & registration
-2. Node analysis tools
-3. Edge analysis tools
-4. Web search integration
-5. User confirmation system
-6. LangGraph agent interface
+**Status**: Planning phase - architecture defined, implementation next
 
 ---
 
 ## Future Phases
 
 ### Phase 8: Real-Time Updates
-
-- WebSocket connection for live activity feed
-- Broadcast events on background task completion
-- Connection status indicator
-- Review queue for suggested connections
+WebSocket connection for live activity feed, event broadcasting, connection status indicator, review queue for suggestions
 
 ### Phase 9: Feedback Loop & Learning
-
-- Store feedback in PostgreSQL
-- Track approval/rejection rates
-- Adjust confidence thresholds based on feedback
-- Analyze patterns in rejections (training data for future model improvements)
+Store user feedback, track approval/rejection rates, adjust confidence thresholds dynamically, analyze patterns for model improvement
 
 ### Phase 10: Natural Language Querying
-
-- LLM interprets questions about the graph
-- Generates Cypher queries dynamically (GraphCypherQAChain)
-- Synthesizes answers from graph data
-- Examples: "What supports hypothesis X?", "Show gaps in topic Y"
+LLM interprets questions about the graph, generates Cypher queries dynamically, synthesizes answers from graph data
 
 ### Phase 11: User Authentication
-
-- FastAPI-Users integration (OAuth 2.1 planned)
-- JWT token authentication
-- Multi-user support
-- Activity attribution per user
+Multi-user support with FastAPI-Users, JWT tokens, OAuth 2.1, activity attribution per user
 
 ### Phase 12: MCP Server
+Expose ThoughtLab tools via Model Context Protocol for Claude Desktop, Cursor, and other MCP-compatible apps
 
-**Goal**: Expose ThoughtLab tools via Model Context Protocol.
-
-> 📄 **Implementation Plan**: See [langchain_implementation.md](./langchain_implementation.md#mcp-server-integration)
-
-- Separate `mcp-server/` package
-- Thin wrapper tools calling ThoughtLab API
-- Compatible with Claude Desktop, Cursor, etc.
-- Publish to PyPI as `thoughtlab-mcp`
+> 📄 **Details**: [langchain_implementation.md](./langchain_implementation.md#mcp-server-integration)
 
 ### Phase 13: Chrome Extension
+Capture web content directly into knowledge graph via context menu, popup dashboard, optional sidebar
 
-**Goal**: Capture web content directly into the knowledge graph.
-
-> 📄 **Implementation Plan**: See [langchain_implementation.md](./langchain_implementation.md#chrome-extension)
-
-- Context menu: "Add as Observation", "Save Page as Source"
-- Popup with recent activity and quick search
-- Optional sidebar with graph view
-- Publish to Chrome Web Store
+> 📄 **Details**: [langchain_implementation.md](./langchain_implementation.md#chrome-extension)
 
 ---
 
 ## Optional/Deferred
 
 ### Background Job Processing (ARQ/Celery)
+**Status**: Deferred - synchronous AI processing (3-5s) acceptable for current use case
 
-**Status**: Deferred until proven necessary by real-world usage data
+Implement when: API timeouts, >10s processing, multi-user contention, batch processing needs, or proven performance bottleneck
 
-**Rationale**: Current synchronous AI processing (3-5s per node) is acceptable for single-user research workflows. We're focusing on making AI operations more powerful and user-controlled rather than optimizing for scale prematurely.
+> 📄 **Details**: [02-ARCHITECTURE_DECISIONS.md](./02-ARCHITECTURE_DECISIONS.md#background-processing-deferred-arq-when-needed)
 
-**Decision Criteria** - Implement when:
-- ❌ Users report API timeouts during node creation
-- ❌ Processing time exceeds 10 seconds regularly
-- ❌ Multi-user deployments show resource contention
-- ❌ Batch operations needed (re-analyze entire graph)
-- ❌ Performance monitoring shows clear bottleneck
-
-**Implementation Plan** (when needed):
-> 📄 See [langchain_implementation.md](./langchain_implementation.md#arq-background-processing-upgrade)
-
-- ARQ (async Redis queue) or Celery
-- Worker service in Docker Compose
-- Job status monitoring in Activity Feed
-- Retry logic and error handling
-
-### Phase 14: Polish & Performance
-
-- Comprehensive error handling
-- Optimized loading states
-- Graph performance for large datasets
-- Full test coverage
+### Polish & Performance
+Comprehensive error handling, optimized loading states, large graph performance, full test coverage
 
 ---
 
