@@ -39,7 +39,7 @@ function App() {
       {/* Header */}
       <header className="bg-white shadow-sm border-b px-6 py-4 flex justify-between items-center dark:bg-gray-800 dark:border-gray-700">
         <h1 className="text-xl font-semibold font-[Geo] text-4xl text-gray-800 dark:text-gray-100">
-          toughtlab.ai alpha 0.1.0
+          toughtlab.ai alpha 0.2.0
         </h1>
         <div className="flex items-center gap-2">
           <button

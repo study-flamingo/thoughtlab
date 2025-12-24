@@ -39,7 +39,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Research Connection Graph API",
     description="API for managing research knowledge graphs with AI-powered connection discovery",
-    version="0.1.0",
+    version="0.2.0-alpha",
     lifespan=lifespan,
 )
 

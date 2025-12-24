@@ -1,5 +1,5 @@
 # ThoughtLab 💭
-- v0.1.0-alpha
+- v0.2.0-alpha
 
 A web-based research application that helps you discover meaningful connections between sources, observations, hypotheses, and concepts using graph database technology.
 
@@ -281,16 +281,24 @@ docker-compose ps  # Should show "healthy"
 - Graph database (Neo4j) integration
 - Relationship management
 - Interactive graph visualization
+- Activity feed with processing status
+- AI-powered relationship discovery (LangChain + LangGraph)
+- Vector embeddings and similarity search
+- Automatic connection suggestions based on semantic similarity
 - Comprehensive test suite
 - Security scanning (Gitleaks)
 
 ### 🚧 Coming Soon
 
+- LLM-powered graph operations (find related, summarize, web search, merge nodes)
+- Natural language tool interface for graph manipulation
+- User confirmation system for destructive operations
 - Real-time WebSocket updates
-- LLM-powered connection suggestions
 - Advanced search and filtering
 - User authentication
 - Graph export/import
+- MCP server for Claude Desktop integration
+- Chrome extension for web capture
 
 ## License
 
