@@ -120,18 +120,49 @@ THOUGHTLAB_EMBEDDING_MODEL=text-embedding-3-small
 
 ## In Progress
 
-### Phase 7: ARQ Background Processing
+### Phase 7: LLM-Powered Graph Operations
 
-**Goal**: Non-blocking background job processing.
+**Goal**: Unified tool layer enabling LLM agents to intelligently operate on the knowledge graph.
 
-> 📄 **Implementation Plan**: See [langchain_implementation.md](./langchain_implementation.md#arq-background-processing-upgrade)
+> 📄 **Architecture**: See [TOOL_ARCHITECTURE.md](./TOOL_ARCHITECTURE.md)
 
-**Tasks**:
-- [ ] Add ARQ worker configuration
-- [ ] Create job definitions for node processing
-- [ ] Add worker service to Docker Compose
-- [ ] Update API routes to enqueue jobs
-- [ ] Monitor job status in Activity Feed
+**Design Decision**: Rather than adding background job infrastructure (ARQ), we're focusing on making the existing AI capabilities more powerful and user-controlled through a tool-based architecture. This allows LLM agents to perform complex graph operations via tool calls.
+
+**Key Capabilities**:
+
+**Node Operations**:
+- [ ] Find and link related nodes (semantic search + auto-linking)
+- [ ] Recalculate confidence (context-aware re-analysis)
+- [ ] Summarize node (LLM-generated summary)
+- [ ] Summarize with context (include relationships)
+- [ ] Search web for evidence (supporting/contradicting)
+- [ ] Reclassify node type (Observation → Hypothesis, etc.)
+
+**Edge Operations**:
+- [ ] Recalculate relationship confidence
+- [ ] Reclassify relationship type
+- [ ] Summarize relationship (explain connection)
+- [ ] Merge related nodes (with confirmation)
+
+**Infrastructure**:
+- [ ] Tool layer architecture (`backend/app/tools/`)
+- [ ] Tool registration and discovery system
+- [ ] User confirmation system for destructive operations
+- [ ] Activity feed integration for tool execution
+- [ ] LangGraph agent for natural language tool selection
+
+**Safety**:
+- All destructive operations (delete, merge) require user confirmation
+- LLM receives feedback about user approval/denial decisions
+- Comprehensive audit trail in Activity Feed
+
+**Implementation Phases**:
+1. Core tool infrastructure & registration
+2. Node analysis tools
+3. Edge analysis tools
+4. Web search integration
+5. User confirmation system
+6. LangGraph agent interface
 
 ---
 
@@ -186,6 +217,31 @@ THOUGHTLAB_EMBEDDING_MODEL=text-embedding-3-small
 - Popup with recent activity and quick search
 - Optional sidebar with graph view
 - Publish to Chrome Web Store
+
+---
+
+## Optional/Deferred
+
+### Background Job Processing (ARQ/Celery)
+
+**Status**: Deferred until proven necessary by real-world usage data
+
+**Rationale**: Current synchronous AI processing (3-5s per node) is acceptable for single-user research workflows. We're focusing on making AI operations more powerful and user-controlled rather than optimizing for scale prematurely.
+
+**Decision Criteria** - Implement when:
+- ❌ Users report API timeouts during node creation
+- ❌ Processing time exceeds 10 seconds regularly
+- ❌ Multi-user deployments show resource contention
+- ❌ Batch operations needed (re-analyze entire graph)
+- ❌ Performance monitoring shows clear bottleneck
+
+**Implementation Plan** (when needed):
+> 📄 See [langchain_implementation.md](./langchain_implementation.md#arq-background-processing-upgrade)
+
+- ARQ (async Redis queue) or Celery
+- Worker service in Docker Compose
+- Job status monitoring in Activity Feed
+- Retry logic and error handling
 
 ### Phase 14: Polish & Performance
 

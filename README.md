@@ -290,7 +290,9 @@ docker-compose ps  # Should show "healthy"
 
 ### 🚧 Coming Soon
 
-- Background job processing (ARQ)
+- LLM-powered graph operations (find related, summarize, web search, merge nodes)
+- Natural language tool interface for graph manipulation
+- User confirmation system for destructive operations
 - Real-time WebSocket updates
 - Advanced search and filtering
 - User authentication

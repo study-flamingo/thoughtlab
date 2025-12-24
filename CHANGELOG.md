@@ -169,7 +169,7 @@ This alpha release includes the complete Activity Feed system, background proces
 | 0.1.0 | Project setup | ✅ Complete |
 | 0.2.0 | Backend + Frontend foundation | ✅ Complete |
 | 0.2.0-alpha | Activity Feed + AI Integration (Phases 5-6) | ✅ Complete |
-| 0.3.0 | ARQ Background Processing (Phase 7) | 📋 Planned |
+| 0.3.0 | LLM-Powered Graph Operations (Phase 7) | 📋 Planned |
 | 0.4.0 | Real-time Updates (Phase 8) | 📋 Planned |
 | 1.0.0 | Production-ready release | 📋 Planned |
 
@@ -177,12 +177,31 @@ This alpha release includes the complete Activity Feed system, background proces
 
 ## Upcoming Milestones
 
-### 0.3.0 - ARQ Background Processing (Phase 7)
-- [ ] Add ARQ worker configuration
-- [ ] Create job definitions for node processing
-- [ ] Add worker service to Docker Compose
-- [ ] Update API routes to enqueue jobs
-- [ ] Monitor job status in Activity Feed
+### 0.3.0 - LLM-Powered Graph Operations (Phase 7)
+
+**Focus**: Unified tool layer enabling LLM agents to intelligently operate on the knowledge graph via tool calls.
+
+**Design Decision**: Deferring ARQ/background processing in favor of powerful, user-controlled LLM operations. Current synchronous AI processing (3-5s) is acceptable; we're optimizing for capability over scale.
+
+**Node Operations**:
+- [ ] Find and link related nodes (semantic search + auto-linking)
+- [ ] Recalculate node confidence (context-aware re-analysis)
+- [ ] Summarize node with/without relationship context
+- [ ] Search web for supporting/contradicting evidence
+- [ ] Reclassify node type (Observation → Hypothesis, etc.)
+
+**Edge Operations**:
+- [ ] Recalculate relationship confidence
+- [ ] Reclassify relationship type
+- [ ] Summarize relationship (explain connection)
+- [ ] Merge related nodes (with user confirmation)
+
+**Infrastructure**:
+- [ ] Tool layer architecture (`backend/app/tools/`)
+- [ ] Tool registration and discovery system
+- [ ] User confirmation system for destructive operations
+- [ ] Activity feed integration for tool execution
+- [ ] LangGraph agent for natural language interface
 
 ### 0.4.0 - Real-time Updates (Phase 8)
 - [ ] WebSocket connection for live activity feed
