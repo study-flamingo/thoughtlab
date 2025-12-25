@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "thoughtlab": {
+      "command": "python",
+      "args": [
+        "C:\\Users\\YourName\\Code\\Repos\\thoughtlab\\backend\\mcp_server.py"
+      ],
+      "env": {
+        "THOUGHTLAB_OPENAI_API_KEY": "sk-your-api-key-here",
+        "THOUGHTLAB_API_BASE_URL": "http://localhost:8000/api/v1",
+        "THOUGHTLAB_API_TIMEOUT": "30.0"
+      }
+    }
+  }
+}

@@ -10,42 +10,63 @@ RUN_DIR="$PROJECT_ROOT/.run"
 echo "🛑 Stopping Research Connection Graph servers..."
 echo ""
 
-# Function to find and kill process on a port
+# Detect if running on Windows (Git Bash, MSYS, Cygwin)
+is_windows() {
+    [[ "$OSTYPE" == "msys" ]] || [[ "$OSTYPE" == "cygwin" ]] || [[ "$OS" == "Windows_NT" ]]
+}
+
+# Function to find and kill process on a port (Windows-aware)
 kill_port() {
     local port=$1
     local name=$2
-    
-    # Try different methods to find the process
     local pids=""
     
-    if command -v lsof > /dev/null 2>&1; then
-        pids=$(lsof -ti :$port 2>/dev/null || true)
-    elif command -v fuser > /dev/null 2>&1; then
-        pids=$(fuser $port/tcp 2>/dev/null | awk '{print $1}' || true)
-    elif command -v netstat > /dev/null 2>&1; then
-        pids=$(netstat -tlnp 2>/dev/null | grep ":$port " | awk '{print $7}' | cut -d'/' -f1 || true)
-    elif command -v ss > /dev/null 2>&1; then
-        pids=$(ss -tlnp 2>/dev/null | grep ":$port " | grep -oP 'pid=\K[0-9]+' || true)
+    if is_windows; then
+        # Windows: use netstat to find PIDs on the port
+        pids=$(netstat -ano 2>/dev/null | grep -E "LISTENING.*:$port\b" | awk '{print $NF}' | grep -E '^[0-9]+$' | sort -u || true)
+        
+        if [ -n "$pids" ]; then
+            for pid in $pids; do
+                if [ "$pid" != "0" ]; then
+                    echo "Stopping $name (PID: $pid) on port $port..."
+                    # Use taskkill on Windows - force kill the process tree
+                    taskkill //F //PID $pid //T 2>/dev/null || true
+                fi
+            done
+            echo "✅ Stopped $name"
+            return 0
+        fi
+    else
+        # Unix: try lsof, fuser, netstat, ss
+        if command -v lsof > /dev/null 2>&1; then
+            pids=$(lsof -ti :$port 2>/dev/null || true)
+        elif command -v fuser > /dev/null 2>&1; then
+            pids=$(fuser $port/tcp 2>/dev/null | awk '{print $1}' || true)
+        elif command -v netstat > /dev/null 2>&1; then
+            pids=$(netstat -tlnp 2>/dev/null | grep ":$port " | awk '{print $7}' | cut -d'/' -f1 || true)
+        elif command -v ss > /dev/null 2>&1; then
+            pids=$(ss -tlnp 2>/dev/null | grep ":$port " | grep -oP 'pid=\K[0-9]+' || true)
+        fi
+        
+        if [ -n "$pids" ] && [ "$pids" != "" ]; then
+            for pid in $pids; do
+                echo "Stopping $name (PID: $pid) on port $port..."
+                kill $pid 2>/dev/null || true
+            done
+            sleep 1
+            # Force kill if still running
+            for pid in $pids; do
+                if kill -0 $pid 2>/dev/null; then
+                    kill -9 $pid 2>/dev/null || true
+                fi
+            done
+            echo "✅ Stopped $name"
+            return 0
+        fi
     fi
     
-    if [ -n "$pids" ] && [ "$pids" != "" ]; then
-        for pid in $pids; do
-            echo "Stopping $name (PID: $pid) on port $port..."
-            kill $pid 2>/dev/null || true
-        done
-        sleep 1
-        # Force kill if still running
-        for pid in $pids; do
-            if kill -0 $pid 2>/dev/null; then
-                kill -9 $pid 2>/dev/null || true
-            fi
-        done
-        echo "✅ Stopped $name"
-        return 0
-    else
-        echo "ℹ️  No $name process found on port $port"
-        return 1
-    fi
+    echo "ℹ️  No $name process found on port $port"
+    return 1
 }
 
 # Kill ALL uvicorn processes (parent and children) to ensure clean restart
@@ -53,30 +74,43 @@ kill_uvicorn_processes() {
     echo "Searching for all uvicorn processes..."
     local found=0
     
-    # Method 1: pgrep for uvicorn
-    if command -v pgrep > /dev/null 2>&1; then
-        UVICORN_PIDS=$(pgrep -f "uvicorn" 2>/dev/null || true)
-        if [ -n "$UVICORN_PIDS" ]; then
-            for pid in $UVICORN_PIDS; do
-                echo "  Killing uvicorn process (PID: $pid)..."
-                kill -9 $pid 2>/dev/null || true
-                found=1
+    if is_windows; then
+        # Windows: use wmic to find python processes running uvicorn
+        local uvicorn_pids=$(wmic process where "name='python.exe' and commandline like '%uvicorn%'" get processid 2>/dev/null | grep -E '^[0-9]+' | tr -d '\r' || true)
+        if [ -n "$uvicorn_pids" ]; then
+            for pid in $uvicorn_pids; do
+                pid=$(echo "$pid" | tr -d ' \r\n')
+                if [ -n "$pid" ] && [ "$pid" != "0" ]; then
+                    echo "  Killing uvicorn process (PID: $pid)..."
+                    taskkill //F //PID $pid //T 2>/dev/null || true
+                    found=1
+                fi
             done
+        fi
+    else
+        # Unix: pgrep for uvicorn
+        if command -v pgrep > /dev/null 2>&1; then
+            UVICORN_PIDS=$(pgrep -f "uvicorn" 2>/dev/null || true)
+            if [ -n "$UVICORN_PIDS" ]; then
+                for pid in $UVICORN_PIDS; do
+                    echo "  Killing uvicorn process (PID: $pid)..."
+                    kill -9 $pid 2>/dev/null || true
+                    found=1
+                done
+            fi
         fi
     fi
     
-    # Method 2: On Windows (Git Bash), use taskkill
-    if command -v taskkill > /dev/null 2>&1; then
-        # Kill Python processes running uvicorn
-        taskkill //F //FI "IMAGENAME eq python.exe" //FI "WINDOWTITLE eq *uvicorn*" 2>/dev/null || true
-    fi
-    
-    # Method 3: Kill from PID file
+    # Kill from PID file (cross-platform)
     if [ -f "$RUN_DIR/backend.pid" ]; then
-        local pid=$(cat "$RUN_DIR/backend.pid" 2>/dev/null)
+        local pid=$(cat "$RUN_DIR/backend.pid" 2>/dev/null | tr -d '\r\n')
         if [ -n "$pid" ]; then
             echo "  Killing backend from PID file (PID: $pid)..."
-            kill -9 $pid 2>/dev/null || true
+            if is_windows; then
+                taskkill //F //PID $pid //T 2>/dev/null || true
+            else
+                kill -9 $pid 2>/dev/null || true
+            fi
             found=1
         fi
         rm -f "$RUN_DIR/backend.pid"
@@ -94,23 +128,43 @@ kill_vite_processes() {
     echo "Searching for all vite/frontend processes..."
     local found=0
     
-    if command -v pgrep > /dev/null 2>&1; then
-        VITE_PIDS=$(pgrep -f "vite" 2>/dev/null || true)
-        if [ -n "$VITE_PIDS" ]; then
-            for pid in $VITE_PIDS; do
-                echo "  Killing vite process (PID: $pid)..."
-                kill -9 $pid 2>/dev/null || true
-                found=1
+    if is_windows; then
+        # Windows: use wmic to find node processes running vite
+        local vite_pids=$(wmic process where "name='node.exe' and commandline like '%vite%'" get processid 2>/dev/null | grep -E '^[0-9]+' | tr -d '\r' || true)
+        if [ -n "$vite_pids" ]; then
+            for pid in $vite_pids; do
+                pid=$(echo "$pid" | tr -d ' \r\n')
+                if [ -n "$pid" ] && [ "$pid" != "0" ]; then
+                    echo "  Killing vite process (PID: $pid)..."
+                    taskkill //F //PID $pid //T 2>/dev/null || true
+                    found=1
+                fi
             done
+        fi
+    else
+        # Unix: pgrep for vite
+        if command -v pgrep > /dev/null 2>&1; then
+            VITE_PIDS=$(pgrep -f "vite" 2>/dev/null || true)
+            if [ -n "$VITE_PIDS" ]; then
+                for pid in $VITE_PIDS; do
+                    echo "  Killing vite process (PID: $pid)..."
+                    kill -9 $pid 2>/dev/null || true
+                    found=1
+                done
+            fi
         fi
     fi
     
-    # Method: Kill from PID file
+    # Kill from PID file (cross-platform)
     if [ -f "$RUN_DIR/frontend.pid" ]; then
-        local pid=$(cat "$RUN_DIR/frontend.pid" 2>/dev/null)
+        local pid=$(cat "$RUN_DIR/frontend.pid" 2>/dev/null | tr -d '\r\n')
         if [ -n "$pid" ]; then
             echo "  Killing frontend from PID file (PID: $pid)..."
-            kill -9 $pid 2>/dev/null || true
+            if is_windows; then
+                taskkill //F //PID $pid //T 2>/dev/null || true
+            else
+                kill -9 $pid 2>/dev/null || true
+            fi
             found=1
         fi
         rm -f "$RUN_DIR/frontend.pid"

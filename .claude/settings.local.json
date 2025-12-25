@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -m app.main:*)",
+      "Bash(.venv/Scripts/python.exe:*)",
+      "Bash(del validate_tools.py)",
+      "Bash(uv pip install:*)",
+      "Bash(uv sync:*)",
+      "Bash(uv pip:*)",
+      "mcp__context7__resolve-library-id",
+      "mcp__context7__get-library-docs",
+      "Bash(git add:*)"
+    ]
+  }
+}

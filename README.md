@@ -5,12 +5,16 @@ A web-based research application that helps you discover meaningful connections 
 
 ## Features
 
-✅ **Node Management** - Create and manage observations, sources, and hypotheses  
-✅ **Relationship Tracking** - Connect nodes with typed relationships (SUPPORTS, CONTRADICTS, RELATES_TO, etc.)  
-✅ **Interactive Graph Visualization** - Visualize your knowledge graph with Cytoscape.js (zoom, pan, click nodes)  
-✅ **RESTful API** - Complete API for programmatic access  
-✅ **Node Details Panel** - Click nodes to view details  
-✅ **Real-time Updates** - Activity feed ready for live updates (WebSocket integration coming soon)  
+✅ **Node Management** - Create and manage observations, sources, and hypotheses
+✅ **Relationship Tracking** - Connect nodes with typed relationships (SUPPORTS, CONTRADICTS, RELATES_TO, etc.)
+✅ **Interactive Graph Visualization** - Visualize your knowledge graph with Cytoscape.js (zoom, pan, click nodes)
+✅ **RESTful API** - Complete API for programmatic access
+✅ **Node Details Panel** - Click nodes to view details
+✅ **Real-time Updates** - Activity feed ready for live updates (WebSocket integration coming soon)
+✅ **AI-Powered Analysis** - LLM-powered graph operations via REST API, LangGraph agents, and MCP server
+✅ **Claude Desktop Integration** - Use Claude to interact with your knowledge graph via MCP
+✅ **Intelligent Agents** - LangGraph agents with automatic tool selection for complex reasoning
+✅ **Vector Search** - Semantic similarity search using OpenAI embeddings  
 
 ## Quickstart
 

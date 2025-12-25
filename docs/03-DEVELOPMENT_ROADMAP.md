@@ -86,27 +86,53 @@ See [ADR-012: Development Principles](./02-ARCHITECTURE_DECISIONS.md#adr-012-dev
 
 > 📄 **Details**: [02-ARCHITECTURE_DECISIONS.md](./02-ARCHITECTURE_DECISIONS.md#langgraph--langchain--openai)
 
----
-
-## In Progress
-
-### Phase 7: LLM-Powered Graph Operations
+### Phase 7: LLM-Powered Graph Operations ✅
 
 **Goal**: Enable LLM agents to intelligently manipulate the knowledge graph through natural language.
 
 > 📄 **Detailed Architecture**: [02-ARCHITECTURE_DECISIONS.md](./02-ARCHITECTURE_DECISIONS.md#llm-powered-graph-operations)
-> 📄 **Technical Specification**: [TOOL_ARCHITECTURE.md](./TOOL_ARCHITECTURE.md)
+> 📄 **Backend API Spec**: [PHASE_7_API_SPEC.md](./PHASE_7_API_SPEC.md)
+> 📄 **LangGraph Integration**: [PHASE_8_LANGGRAPH_INTEGRATION.md](./PHASE_8_LANGGRAPH_INTEGRATION.md)
+> 📄 **Implementation Summary**: [COMPLETE_IMPLEMENTATION_SUMMARY.md](./COMPLETE_IMPLEMENTATION_SUMMARY.md)
 
-**Approach**: Build a unified tool layer where LLMs can perform graph operations via function calls, rather than adding background job infrastructure (deferred until proven necessary).
+**Approach**: Built a three-layer modular architecture with complete separation of concerns via HTTP REST API.
+
+**Implementation**:
+
+- **Backend API Layer**: 7 REST endpoints for all LLM operations (find related, summarize, recalculate confidence, etc.)
+- **LangGraph Agent Layer**: ReAct agent with 5 tools calling backend via HTTP, intelligent tool selection
+- **MCP Server Layer**: 6 MCP tools exposing same operations for Claude Desktop integration
 
 **Core Capabilities**:
 
-- **Node Operations**: Find related nodes, recalculate confidence, generate summaries, search web for evidence, reclassify types
-- **Edge Operations**: Recalculate relationship strength, reclassify types, explain connections, merge duplicate nodes
-- **Safety**: All destructive operations require user confirmation with feedback to LLM
-- **Interface**: Natural language commands translated to tool calls via LangGraph agent
+- **Node Operations**: Find semantically similar nodes, generate AI summaries with/without context, recalculate confidence based on relationships
+- **Relationship Operations**: Summarize connections, explain relationships
+- **Health Monitoring**: Backend API health checks
+- **Interface Options**: Direct API, LangGraph agents (Python), MCP clients (Claude Desktop)
 
-**Status**: Planning phase - architecture defined, implementation next
+**Status**: Complete and validated - all three layers implemented with comprehensive documentation
+
+### Phase 12: MCP Server ✅
+
+**Goal**: Expose ThoughtLab tools via Model Context Protocol for Claude Desktop and other MCP-compatible apps.
+
+> 📄 **Complete Guide**: [MCP_SERVER_GUIDE.md](./MCP_SERVER_GUIDE.md)
+
+**Implementation**: FastMCP-based server exposing 6 tools via stdio transport, using same backend API as LangGraph agents.
+
+**Features**:
+- Claude Desktop integration ready
+- Same backend API ensuring consistency
+- Complete separation from agent layer
+- Fully validated and documented
+
+**Status**: Complete - ready for use with Claude Desktop
+
+---
+
+## In Progress
+
+*No phases currently in progress*
 
 ---
 
@@ -123,11 +149,6 @@ LLM interprets questions about the graph, generates Cypher queries dynamically, 
 
 ### Phase 11: User Authentication
 Multi-user support with FastAPI-Users, JWT tokens, OAuth 2.1, activity attribution per user
-
-### Phase 12: MCP Server
-Expose ThoughtLab tools via Model Context Protocol for Claude Desktop, Cursor, and other MCP-compatible apps
-
-> 📄 **Details**: [langchain_implementation.md](./langchain_implementation.md#mcp-server-integration)
 
 ### Phase 13: Chrome Extension
 Capture web content directly into knowledge graph via context menu, popup dashboard, optional sidebar
