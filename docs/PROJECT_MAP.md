@@ -1,162 +1,379 @@
 ## Project Map
 
-This document maps the repository’s structure, major components, and the responsibilities of key files, with links so you can jump straight into the code.
+Quick reference for finding code in the ThoughtLab repository.
 
-## High-level architecture
-- **Backend**: FastAPI (Python) with Neo4j (primary store), Redis (cache/RT), optional Postgres (scaffolded)
+---
+
+## High-Level Architecture
+
+- **Backend**: FastAPI (Python) with Neo4j (graph), Redis (cache), PostgreSQL (scaffolded)
 - **Frontend**: React + TypeScript + Vite + Tailwind + React Query + Cytoscape.js
+- **AI**: LangChain/LangGraph + OpenAI for embeddings, agents, and MCP server
 - **Infra**: Docker Compose for Neo4j and Redis
-- **Tests**: pytest (backend), vitest/testing-library (frontend)
+
+---
 
 ## Backend (FastAPI)
-- App entrypoint and wiring
-  - [app/main.py](../backend/app/main.py): FastAPI app, CORS, lifespan startup/shutdown (connects to Neo4j/Redis), mounts routers, `/` and `/health`.
-  - [app/core/config.py](../backend/app/core/config.py): Centralized environment config via pydantic-settings (`NEO4J_*`, `DATABASE_URL`, `REDIS_URL`, `SECRET_KEY`, etc.).
-- API routes
-  - [app/api/routes/nodes.py](../backend/app/api/routes/nodes.py): CRUD for `Observation`, `Source`, `Hypothesis`, `Entity`; relationship CRUD; generic `GET /nodes/{id}`; `GET /{id}/connections`; `DELETE /nodes/{id}`.
-  - [app/api/routes/graph.py](../backend/app/api/routes/graph.py): `GET /graph/full` for full graph visualization payload.
-  - [app/api/routes/settings.py](../backend/app/api/routes/settings.py): `GET /settings` and `PUT /settings` for app-wide settings (theme, layout, colors).
-  - [app/api/routes/activities.py](../backend/app/api/routes/activities.py): Activity feed endpoints; approve/reject suggestions; processing status queries.
-- Services (domain logic)
-  - [app/services/graph_service.py](../backend/app/services/graph_service.py): All Neo4j Cypher logic; create/update/read/delete nodes; create/update/delete relationships; `get_node_connections`; `get_full_graph`; settings management; JSON-safe conversions.
-  - [app/services/activity_service.py](../backend/app/services/activity_service.py): Activity feed CRUD; suggestion approve/reject workflow; processing status tracking.
-  - [app/services/embedding_service.py](../backend/app/services/embedding_service.py): Legacy embedding interface (stub); see `app/ai/` for LangChain implementation.
-  - [app/services/processing_service.py](../backend/app/services/processing_service.py): Background processing orchestrator; delegates to AI workflow when configured.
-- AI Module (LangChain integration)
-  - [app/ai/config.py](../backend/app/ai/config.py): AI configuration settings (models, thresholds, API keys).
-  - [app/ai/embeddings.py](../backend/app/ai/embeddings.py): OpenAI embeddings via LangChain; Neo4j vector storage.
-  - [app/ai/similarity.py](../backend/app/ai/similarity.py): Vector similarity search using Neo4j indexes.
-  - [app/ai/classifier.py](../backend/app/ai/classifier.py): LLM-based relationship classification with structured output.
-  - [app/ai/workflow.py](../backend/app/ai/workflow.py): Main AI processing workflow; orchestrates chunking → embedding → similarity → classification → suggestions.
-- Utilities
-  - [app/utils/chunking.py](../backend/app/utils/chunking.py): RecursiveCharacterSplitter for breaking long content into embeddable chunks.
-- Models (request/response DTOs, enums)
-  - [app/models/nodes.py](../backend/app/models/nodes.py): Pydantic models for node types (`Observation`, `Hypothesis`, `Source`, `Concept`, `Entity`, `Chunk`) and open relationship types; `*Create`/`*Update`/`*Response` DTOs.
-  - [app/models/activity.py](../backend/app/models/activity.py): Activity types, status enums, suggestion data, processing data, confidence thresholds.
-  - [app/models/settings.py](../backend/app/models/settings.py): `AppSettings`, `AppSettingsUpdate`, `RelationStyle` models for application configuration.
-- Database connectors
-  - [app/db/neo4j.py](../backend/app/db/neo4j.py): Async driver manager, `neo4j_conn.get_session()`.
-  - [app/db/redis.py](../backend/app/db/redis.py): Async Redis client manager, `redis_conn.get_client()`.
-  - [app/db/postgres.py](../backend/app/db/postgres.py): Async SQLAlchemy engine/session (currently scaffolded, not used by routes).
-- Dependencies
-  - [backend/requirements.txt](../backend/requirements.txt): Core backend dependencies and test deps.
-- Tests
-  - [backend/tests/](../backend/tests/): Backend test suite and fixtures.
-    - [test_api_nodes.py](../backend/tests/test_api_nodes.py)
-    - [test_graph_service.py](../backend/tests/test_graph_service.py)
-    - [test_models.py](../backend/tests/test_models.py)
-    - [conftest.py](../backend/tests/conftest.py)
 
-### Backend endpoints (quick index)
-- Graph
-  - `GET /api/v1/graph/full` → [graph.py](../backend/app/api/routes/graph.py) → `graph_service.get_full_graph`
-- Nodes
-  - `POST /api/v1/nodes/observations` → create Observation
-  - `GET /api/v1/nodes/observations/{id}` → get Observation
-  - `GET /api/v1/nodes/observations` → list Observations
-  - `PUT /api/v1/nodes/observations/{id}` → update Observation
-  - `POST /api/v1/nodes/sources` → create Source
-  - `POST /api/v1/nodes/hypotheses` / `PUT /api/v1/nodes/hypotheses/{id}` → create/update Hypothesis
-  - `POST /api/v1/nodes/entities` / `PUT /api/v1/nodes/entities/{id}` → create/update Entity
-  - `GET /api/v1/nodes/{id}/connections?max_depth=2` → connections around a node
-  - `GET /api/v1/nodes/{id}` → generic node by id
-  - `DELETE /api/v1/nodes/{id}` → delete node and its relationships
-- Relationships
-  - `POST /api/v1/nodes/relationships` → create relationship
-  - `GET /api/v1/nodes/relationships/{id}` → get relationship by id
-  - `PUT /api/v1/nodes/relationships/{id}` → update relationship
-  - `DELETE /api/v1/nodes/relationships/{id}` → delete relationship
-- Settings
-  - `GET /api/v1/settings` → get app settings
-  - `PUT /api/v1/settings` → update app settings
-- Activities
-  - `GET /api/v1/activities` → list activities (with filters)
-  - `GET /api/v1/activities/pending` → get pending suggestions
-  - `GET /api/v1/activities/processing/{node_id}` → get processing status for a node
-  - `GET /api/v1/activities/{id}` → get single activity
-  - `POST /api/v1/activities/{id}/approve` → approve suggestion, create relationship
-  - `POST /api/v1/activities/{id}/reject` → reject suggestion with optional feedback
+### App Entrypoint & Configuration
+
+- [app/main.py](../backend/app/main.py) - FastAPI app, CORS, lifespan, mounts routers
+- [app/core/config.py](../backend/app/core/config.py) - Environment configuration (Pydantic settings)
+
+### API Routes
+
+- [app/api/routes/nodes.py](../backend/app/api/routes/nodes.py) - Node CRUD (Observation, Source, Hypothesis, Entity, Concept)
+- [app/api/routes/graph.py](../backend/app/api/routes/graph.py) - Full graph visualization endpoint
+- [app/api/routes/settings.py](../backend/app/api/routes/settings.py) - App settings (theme, layout, colors)
+- [app/api/routes/activities.py](../backend/app/api/routes/activities.py) - Activity feed, suggestions, processing status
+- [app/api/routes/tools.py](../backend/app/api/routes/tools.py) - LLM-powered tools (find related, summarize, etc.)
+
+### Services (Business Logic)
+
+- [app/services/graph_service.py](../backend/app/services/graph_service.py) - Neo4j operations (CRUD, relationships, queries)
+- [app/services/activity_service.py](../backend/app/services/activity_service.py) - Activity feed CRUD, suggestions workflow
+- [app/services/processing_service.py](../backend/app/services/processing_service.py) - Background processing orchestrator
+- [app/services/tool_service.py](../backend/app/services/tool_service.py) - LLM-powered operations implementation
+- [app/services/embedding_service.py](../backend/app/services/embedding_service.py) - Legacy embedding interface (stub)
+
+### AI Module (LangChain/LangGraph)
+
+- [app/ai/config.py](../backend/app/ai/config.py) - AI configuration (models, thresholds, API keys)
+- [app/ai/embeddings.py](../backend/app/ai/embeddings.py) - OpenAI embeddings via LangChain
+- [app/ai/similarity.py](../backend/app/ai/similarity.py) - Vector similarity search (Neo4j indexes)
+- [app/ai/classifier.py](../backend/app/ai/classifier.py) - LLM relationship classification
+- [app/ai/workflow.py](../backend/app/ai/workflow.py) - Main AI processing workflow
+
+### Agent Layer (LangGraph)
+
+- [app/agents/agent.py](../backend/app/agents/agent.py) - ReAct agent with intelligent tool selection
+- [app/agents/tools.py](../backend/app/agents/tools.py) - LangGraph tools (HTTP clients to backend API)
+- [app/agents/config.py](../backend/app/agents/config.py) - Agent configuration
+- [app/agents/state.py](../backend/app/agents/state.py) - Agent state management
+
+### MCP Server
+
+- [app/mcp/server.py](../backend/app/mcp/server.py) - FastMCP server with 6 tools
+- [mcp_server.py](../backend/mcp_server.py) - MCP server entry point
+
+### Models (Request/Response DTOs)
+
+- [app/models/nodes.py](../backend/app/models/nodes.py) - Node types (Observation, Hypothesis, Source, etc.)
+- [app/models/activity.py](../backend/app/models/activity.py) - Activity types, suggestions, processing data
+- [app/models/settings.py](../backend/app/models/settings.py) - App settings models
+
+### Database Connectors
+
+- [app/db/neo4j.py](../backend/app/db/neo4j.py) - Async Neo4j driver manager
+- [app/db/redis.py](../backend/app/db/redis.py) - Async Redis client manager
+- [app/db/postgres.py](../backend/app/db/postgres.py) - Async SQLAlchemy (scaffolded)
+
+### Utilities
+
+- [app/utils/chunking.py](../backend/app/utils/chunking.py) - Text chunking for embeddings
+
+### Examples & Validation
+
+- [examples/agent_demo.py](../backend/examples/agent_demo.py) - LangGraph agent demo
+- [validate_tools.py](../backend/validate_tools.py) - Validate backend API
+- [validate_agent.py](../backend/validate_agent.py) - Validate LangGraph layer
+- [validate_mcp.py](../backend/validate_mcp.py) - Validate MCP server
+
+### Tests
+
+- [tests/conftest.py](../backend/tests/conftest.py) - Shared fixtures
+- [tests/test_api_nodes.py](../backend/tests/test_api_nodes.py) - API endpoint tests
+- [tests/test_graph_service.py](../backend/tests/test_graph_service.py) - Service layer tests
+- [tests/test_models.py](../backend/tests/test_models.py) - Model validation tests
+- [tests/test_api_activities.py](../backend/tests/test_api_activities.py) - Activity feed tests
+- [tests/test_activity_service.py](../backend/tests/test_activity_service.py) - Activity service tests
+
+---
+
+## Backend API Endpoints
+
+### Graph
+
+- `GET /api/v1/graph/full` - Get full graph for visualization
+
+### Nodes
+
+- `POST /api/v1/nodes/observations` - Create Observation
+- `GET /api/v1/nodes/observations/{id}` - Get Observation
+- `GET /api/v1/nodes/observations` - List Observations
+- `PUT /api/v1/nodes/observations/{id}` - Update Observation
+- `POST /api/v1/nodes/sources` - Create Source
+- `POST /api/v1/nodes/hypotheses` - Create Hypothesis
+- `PUT /api/v1/nodes/hypotheses/{id}` - Update Hypothesis
+- `POST /api/v1/nodes/entities` - Create Entity
+- `PUT /api/v1/nodes/entities/{id}` - Update Entity
+- `GET /api/v1/nodes/{id}` - Get any node by ID
+- `GET /api/v1/nodes/{id}/connections` - Get node connections
+- `DELETE /api/v1/nodes/{id}` - Delete node
+
+### Relationships
+
+- `POST /api/v1/nodes/relationships` - Create relationship
+- `GET /api/v1/nodes/relationships/{id}` - Get relationship
+- `PUT /api/v1/nodes/relationships/{id}` - Update relationship
+- `DELETE /api/v1/nodes/relationships/{id}` - Delete relationship
+
+### Settings
+
+- `GET /api/v1/settings` - Get app settings
+- `PUT /api/v1/settings` - Update app settings
+
+### Activities
+
+- `GET /api/v1/activities` - List activities
+- `GET /api/v1/activities/pending` - Get pending suggestions
+- `GET /api/v1/activities/processing/{node_id}` - Get processing status
+- `GET /api/v1/activities/{id}` - Get activity
+- `POST /api/v1/activities/{id}/approve` - Approve suggestion
+- `POST /api/v1/activities/{id}/reject` - Reject suggestion
+
+### AI Tools
+
+- `GET /api/v1/tools/health` - Backend health check
+- `GET /api/v1/tools/capabilities` - List available tools
+- `POST /api/v1/tools/nodes/{id}/find-related` - Find semantically similar nodes
+- `POST /api/v1/tools/nodes/{id}/summarize` - AI-powered summary
+- `POST /api/v1/tools/nodes/{id}/summarize-with-context` - Summary with relationships
+- `POST /api/v1/tools/nodes/{id}/recalculate-confidence` - Re-assess confidence
+- `POST /api/v1/tools/relationships/{id}/summarize` - Explain relationship
+
+---
 
 ## Frontend (React + Vite)
-- App bootstrap
-  - [src/main.tsx](../frontend/src/main.tsx): React root; React Query provider with defaults.
-  - [src/App.tsx](../frontend/src/App.tsx): Layout shell; header with actions (Settings, Add Relation, Add Node); main content (graph); sidebar (inspector/feed); modal wiring; selection state management for nodes and edges.
-- Components
-  - [components/GraphVisualizer.tsx](../frontend/src/components/GraphVisualizer.tsx): Fetches full graph; renders Cytoscape graph; node/edge selection with highlighting; fit/reset controls; legend; dark mode support.
-  - [components/NodeInspector.tsx](../frontend/src/components/NodeInspector.tsx): Loads a node by id; type-specific edit forms for Observation/Entity/Hypothesis; delete functionality; invalidates caches on changes.
-  - [components/RelationInspector.tsx](../frontend/src/components/RelationInspector.tsx): Loads a relationship by id; displays source/target nodes, type, confidence, notes; edit and delete functionality.
-  - [components/CreateNodeModal.tsx](../frontend/src/components/CreateNodeModal.tsx): Tabbed modal for creating Observation/Source/Entity nodes; invalidates graph and closes.
-  - [components/CreateRelationModal.tsx](../frontend/src/components/CreateRelationModal.tsx): Modal for creating relationships between existing nodes; supports relationship type, confidence, notes, and inverse relationships.
-  - [components/SettingsModal.tsx](../frontend/src/components/SettingsModal.tsx): App settings configuration (theme, layout, edge labels, node colors, relation styles).
-  - [components/ActivityFeed.tsx](../frontend/src/components/ActivityFeed.tsx): Interactive activity feed with polling; displays node/relationship events, processing status, LLM suggestions; approve/reject actions; navigation to nodes.
-- API client and types
-  - [services/api.ts](../frontend/src/services/api.ts): Axios client; endpoints for full graph, node CRUD, relationship CRUD, settings, activities.
-  - [types/graph.ts](../frontend/src/types/graph.ts): TS types for nodes, edges, graph payloads, relationship types.
-  - [types/settings.ts](../frontend/src/types/settings.ts): TS types for app settings, relation styles, theme options.
-  - [types/activity.ts](../frontend/src/types/activity.ts): TS types for activities, suggestions, processing data; helper functions for icons/colors.
-- Config and tooling
-  - [package.json](../frontend/package.json): Scripts, dependencies.
-  - [index.html](../frontend/index.html), [src/index.css](../frontend/src/index.css), [tailwind.config.js](../frontend/tailwind.config.js)
-  - [vite.config.ts](../frontend/vite.config.ts), [vitest.config.ts](../frontend/vitest.config.ts), [tsconfig.json](../frontend/tsconfig.json)
-- Tests
-  - [src/App.test.tsx](../frontend/src/App.test.tsx)
-  - [components/__tests__/ActivityFeed.test.tsx](../frontend/src/components/__tests__/ActivityFeed.test.tsx)
-  - [components/__tests__/CreateNodeModal.test.tsx](../frontend/src/components/__tests__/CreateNodeModal.test.tsx)
-  - [components/__tests__/GraphVisualizer.test.tsx](../frontend/src/components/__tests__/GraphVisualizer.test.tsx)
-  - [components/__tests__/SettingsModal.test.tsx](../frontend/src/components/__tests__/SettingsModal.test.tsx)
-  - [services/__tests__/api.test.ts](../frontend/src/services/__tests__/api.test.ts)
-  - Test setup: [src/test/setup.ts](../frontend/src/test/setup.ts)
 
-## Orchestration & scripts
-- Compose services
-  - [docker-compose.yml](../docker-compose.yml): Neo4j (+APOC) and Redis with health checks and volumes.
-  - Neo4j init: [docker/neo4j/init.cypher](../docker/neo4j/init.cypher)
-- Local scripts (root)
-  - [scripts/setup.sh](../scripts/setup.sh), [scripts/setup.ps1](../scripts/setup.ps1): End-to-end setup.
-  - [scripts/start.sh](../scripts/start.sh), [scripts/stop.sh](../scripts/stop.sh), [scripts/restart.sh](../scripts/restart.sh)
-  - [scripts/init_neo4j.sh](../scripts/init_neo4j.sh), [backend/scripts/init_neo4j.py](../backend/scripts/init_neo4j.py)
-  - [scripts/check_versions.py](../scripts/check_versions.py)
+### App Bootstrap
+
+- [src/main.tsx](../frontend/src/main.tsx) - React root, React Query provider
+- [src/App.tsx](../frontend/src/App.tsx) - Layout, header, modals, selection state
+
+### Components
+
+- [components/GraphVisualizer.tsx](../frontend/src/components/GraphVisualizer.tsx) - Cytoscape graph visualization
+- [components/NodeInspector.tsx](../frontend/src/components/NodeInspector.tsx) - Node details and editing
+- [components/RelationInspector.tsx](../frontend/src/components/RelationInspector.tsx) - Relationship details
+- [components/CreateNodeModal.tsx](../frontend/src/components/CreateNodeModal.tsx) - Create nodes modal
+- [components/CreateRelationModal.tsx](../frontend/src/components/CreateRelationModal.tsx) - Create relationships modal
+- [components/SettingsModal.tsx](../frontend/src/components/SettingsModal.tsx) - App settings
+- [components/ActivityFeed.tsx](../frontend/src/components/ActivityFeed.tsx) - Activity feed with polling
+
+### API Client & Types
+
+- [services/api.ts](../frontend/src/services/api.ts) - Axios client, API endpoints
+- [types/graph.ts](../frontend/src/types/graph.ts) - Node, edge, graph types
+- [types/settings.ts](../frontend/src/types/settings.ts) - Settings types
+- [types/activity.ts](../frontend/src/types/activity.ts) - Activity types
+
+### Configuration
+
+- [package.json](../frontend/package.json) - Scripts, dependencies
+- [vite.config.ts](../frontend/vite.config.ts) - Vite build config
+- [vitest.config.ts](../frontend/vitest.config.ts) - Test config
+- [tailwind.config.js](../frontend/tailwind.config.js) - Tailwind config
+
+### Tests
+
+- [src/App.test.tsx](../frontend/src/App.test.tsx) - App component tests
+- [components/__tests__/ActivityFeed.test.tsx](../frontend/src/components/__tests__/ActivityFeed.test.tsx)
+- [components/__tests__/CreateNodeModal.test.tsx](../frontend/src/components/__tests__/CreateNodeModal.test.tsx)
+- [components/__tests__/GraphVisualizer.test.tsx](../frontend/src/components/__tests__/GraphVisualizer.test.tsx)
+- [components/__tests__/SettingsModal.test.tsx](../frontend/src/components/__tests__/SettingsModal.test.tsx)
+- [services/__tests__/api.test.ts](../frontend/src/services/__tests__/api.test.ts)
+- [test/setup.ts](../frontend/src/test/setup.ts) - Test configuration
+
+---
+
+## Infrastructure & Scripts
+
+### Docker
+
+- [docker-compose.yml](../docker-compose.yml) - Neo4j and Redis services
+- [docker/neo4j/init.cypher](../docker/neo4j/init.cypher) - Neo4j initialization
+
+### Scripts
+
+- [setup.sh](../scripts/setup.sh) - End-to-end setup (Linux/Mac/WSL)
+- [setup.ps1](../scripts/setup.ps1) - End-to-end setup (Windows)
+- [start.sh](../scripts/start.sh) - Start all services
+- [stop.sh](../scripts/stop.sh) - Stop all services
+- [restart.sh](../scripts/restart.sh) - Restart all services
+- [init_neo4j.sh](../scripts/init_neo4j.sh) - Initialize Neo4j constraints/indexes
+- [backend/scripts/init_neo4j.py](../backend/scripts/init_neo4j.py) - Python Neo4j init
+- [check_versions.py](../scripts/check_versions.py) - Check Python/Node versions
+
+---
 
 ## Documentation
 
 | Document | Purpose |
 |----------|---------|
-| [01-PROJECT_OVERVIEW.md](./01-PROJECT_OVERVIEW.md) | Vision, features, scope, technical approach |
-| [02-ARCHITECTURE_DECISIONS.md](./02-ARCHITECTURE_DECISIONS.md) | ADRs for all technology choices |
-| [03-DEVELOPMENT_ROADMAP.md](./03-DEVELOPMENT_ROADMAP.md) | Completed phases + future features |
-| [langchain_implementation.md](./langchain_implementation.md) | LangChain + LangGraph AI integration plan |
-| [SETUP.md](./SETUP.md) | Installation and configuration |
-| [TESTING.md](./TESTING.md) | Backend + frontend testing |
-| [DEPENDENCIES.md](./DEPENDENCIES.md) | Package management with uv |
-| [README.md](../README.md) | Project introduction |
+| [README.md](../README.md) | Project introduction, quickstart |
+| [DEVELOPMENT_GUIDE.md](../DEVELOPMENT_GUIDE.md) | Comprehensive dev guide (architecture, setup, workflows) |
+| [PROJECT_MAP.md](./PROJECT_MAP.md) | This file - code location reference |
+| [SETUP.md](./SETUP.md) | Detailed installation guide |
+| [TESTING.md](./TESTING.md) | Testing guide |
+| [DEPENDENCIES.md](./DEPENDENCIES.md) | Dependency management with uv |
+| [MCP_SERVER_GUIDE.md](./MCP_SERVER_GUIDE.md) | MCP server setup and usage |
+| [SECURITY.md](../SECURITY.md) | Security policy |
 
-## How pieces connect (data flow)
-- Frontend
-  - Graph view: `GraphVisualizer` → `graphApi.getFullGraph()` → `GET /api/v1/graph/full` → Neo4j via `graph_service.get_full_graph`.
-  - Node details: `NodeInspector` → `graphApi.getNode(id)` → `GET /api/v1/nodes/{id}` → `graph_service.get_node`.
-  - Relationship details: `RelationInspector` → `graphApi.getRelationship(id)` → `GET /api/v1/nodes/relationships/{id}` → `graph_service.get_relationship`.
-  - Create node: `CreateNodeModal` → `graphApi.create*` → `POST /api/v1/nodes/...` → service `create_*` → invalidate `['graph']`.
-  - Create relationship: `CreateRelationModal` → `graphApi.createRelationship` → `POST /api/v1/nodes/relationships` → service `create_relationship` → invalidate `['graph']`.
-  - Update node: `NodeInspector` → `graphApi.update*` → `PUT /api/v1/nodes/...` → service `update_*` → invalidate `['node', id]` and `['graph']`.
-  - Update relationship: `RelationInspector` → `graphApi.updateRelationship` → `PUT /api/v1/nodes/relationships/{id}` → invalidate `['relationship', id]` and `['graph']`.
-  - Selection: `App.tsx` manages `selectedNodeId` and `selectedEdgeId` state; `GraphVisualizer` emits selection events via callbacks; sidebar renders appropriate inspector based on selection.
-- Backend
-  - Routes validate DTOs (Pydantic) → delegate to `graph_service` → Cypher via `neo4j_conn.get_session()` → JSON-safe responses (temporal types normalized).
+---
 
-## Where to start coding
-- Add/modify API endpoints: [app/api/routes/](../backend/app/api/routes/)
-- Extend graph logic: [app/services/graph_service.py](../backend/app/services/graph_service.py)
-- Adjust validations/models: [app/models/nodes.py](../backend/app/models/nodes.py)
-- Infra/config: [app/core/config.py](../backend/app/core/config.py), [app/db/*](../backend/app/db/), [docker-compose.yml](../docker-compose.yml)
-- UI features: [src/components/](../frontend/src/components/)
-- API/types: [src/services/api.ts](../frontend/src/services/api.ts), [src/types/graph.ts](../frontend/src/types/graph.ts)
+## Feature Locations
 
-## Quick commands
-- Backend
-  - Dev server: `uvicorn app.main:app --reload` (from [backend](../backend/))
-  - Tests: `pytest` (from [backend](../backend/))
-- Frontend
-  - Dev server: `npm run dev` (from [frontend](../frontend/))
-  - Tests: `npm test` (from [frontend](../frontend/))
+### Node Types
+- **Models**: `backend/app/models/nodes.py`
+- **Service**: `backend/app/services/graph_service.py`
+- **API**: `backend/app/api/routes/nodes.py`
+- **Frontend**: `frontend/src/components/CreateNodeModal.tsx`, `NodeInspector.tsx`
 
+### Relationships
+- **Models**: `backend/app/models/nodes.py` (relationship types)
+- **Service**: `backend/app/services/graph_service.py` (create/update/delete)
+- **API**: `backend/app/api/routes/nodes.py`
+- **Frontend**: `frontend/src/components/CreateRelationModal.tsx`, `RelationInspector.tsx`
 
+### Graph Visualization
+- **Frontend**: `frontend/src/components/GraphVisualizer.tsx` (Cytoscape.js)
+- **API**: `backend/app/api/routes/graph.py` (`GET /graph/full`)
+- **Service**: `backend/app/services/graph_service.py` (`get_full_graph`)
+
+### Activity Feed
+- **Models**: `backend/app/models/activity.py`
+- **Service**: `backend/app/services/activity_service.py`
+- **API**: `backend/app/api/routes/activities.py`
+- **Frontend**: `frontend/src/components/ActivityFeed.tsx`
+
+### AI Embedding & Similarity
+- **Config**: `backend/app/ai/config.py`
+- **Embeddings**: `backend/app/ai/embeddings.py` (OpenAI integration)
+- **Similarity**: `backend/app/ai/similarity.py` (Neo4j vector search)
+- **Classifier**: `backend/app/ai/classifier.py` (LLM relationship classification)
+- **Workflow**: `backend/app/ai/workflow.py` (orchestration)
+
+### LLM Tools
+- **API**: `backend/app/api/routes/tools.py`
+- **Service**: `backend/app/services/tool_service.py`
+- **Processing**: `backend/app/services/processing_service.py`
+
+### LangGraph Agents
+- **Agent**: `backend/app/agents/agent.py`
+- **Tools**: `backend/app/agents/tools.py`
+- **Config**: `backend/app/agents/config.py`
+- **Demo**: `backend/examples/agent_demo.py`
+
+### MCP Server
+- **Server**: `backend/app/mcp/server.py`
+- **Entry**: `backend/mcp_server.py`
+- **Config**: `claude_desktop_config.example.json`
+
+### Settings
+- **Models**: `backend/app/models/settings.py`
+- **Service**: `backend/app/services/graph_service.py` (settings CRUD)
+- **API**: `backend/app/api/routes/settings.py`
+- **Frontend**: `frontend/src/components/SettingsModal.tsx`
+
+---
+
+## Data Flow Examples
+
+### Create Node with AI Analysis
+
+```
+Frontend → POST /api/v1/nodes/observations
+          ↓
+Route validates with Pydantic
+          ↓
+graph_service.create_observation()
+          ↓
+Neo4j creates node
+          ↓
+processing_service delegates to ai_workflow
+          ↓
+- Generate embeddings (app/ai/embeddings.py)
+- Store in Neo4j vector index
+- Find similar nodes (app/ai/similarity.py)
+- Classify relationships (app/ai/classifier.py)
+- Create activities for suggestions
+          ↓
+Return node ID to frontend
+```
+
+### Graph Visualization
+
+```
+GraphVisualizer → graphApi.getFullGraph()
+                ↓
+GET /api/v1/graph/full
+                ↓
+graph_service.get_full_graph()
+                ↓
+Cypher query to Neo4j
+                ↓
+Return {nodes: [...], edges: [...]}
+                ↓
+GraphVisualizer renders with Cytoscape.js
+```
+
+### LangGraph Agent Query
+
+```
+User: "Find nodes related to obs-123"
+                ↓
+Agent (app/agents/agent.py) - ReAct reasoning
+                ↓
+Selects find_related_nodes tool
+                ↓
+Tool calls: POST /api/v1/tools/nodes/obs-123/find-related
+                ↓
+tool_service.find_related_nodes()
+                ↓
+- Get node from graph_service
+- Find similar via similarity search
+- Format results
+                ↓
+Return to agent
+                ↓
+Agent synthesizes response to user
+```
+
+---
+
+## Quick Commands
+
+### Backend
+```bash
+cd backend
+uvicorn app.main:app --reload  # Dev server
+pytest                          # Run tests
+pytest --cov=app                # With coverage
+python validate_tools.py        # Validate tools API
+python validate_agent.py        # Validate agent
+python validate_mcp.py          # Validate MCP server
+python examples/agent_demo.py   # Agent demo
+```
+
+### Frontend
+```bash
+cd frontend
+npm run dev                     # Dev server
+npm test                        # Run tests
+npm run test:coverage           # With coverage
+npm run build                   # Production build
+```
+
+### Infrastructure
+```bash
+docker-compose up -d            # Start services
+docker-compose ps               # Check status
+docker-compose logs neo4j       # View logs
+./start.sh                      # Start all
+./stop.sh                       # Stop all
+```
+
+---
+
+**Last Updated**: 2026-01-02

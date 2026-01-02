@@ -270,11 +270,20 @@ docker-compose ps  # Should show "healthy"
 
 ## Documentation
 
-- [Project Overview](./docs/01-PROJECT_OVERVIEW.md)
-- [Architecture Decisions](./docs/02-ARCHITECTURE_DECISIONS.md)
-- [Development Roadmap](./docs/03-DEVELOPMENT_ROADMAP.md)
-- [Testing Guide](./docs/TESTING.md)
-- [Security Policy](./SECURITY.md)
+### Core Documentation
+
+- [DEVELOPMENT_GUIDE.md](./DEVELOPMENT_GUIDE.md) - Comprehensive dev guide (architecture, setup, workflows, extending)
+- [PROJECT_MAP.md](./docs/PROJECT_MAP.md) - Code structure and file locations
+- [SECURITY.md](./SECURITY.md) - Security policy
+
+### Detailed References
+
+- [SETUP.md](./docs/SETUP.md) - Detailed setup instructions
+- [TESTING.md](./docs/TESTING.md) - Testing guide
+- [DEPENDENCIES.md](./docs/DEPENDENCIES.md) - Dependency management
+- [MCP_SERVER_GUIDE.md](./docs/MCP_SERVER_GUIDE.md) - MCP server setup and usage
+- [PHASE_7_API_SPEC.md](./docs/PHASE_7_API_SPEC.md) - Backend API reference
+- [PHASE_8_LANGGRAPH_INTEGRATION.md](./docs/PHASE_8_LANGGRAPH_INTEGRATION.md) - LangGraph integration guide
 
 ## Current Status
 
