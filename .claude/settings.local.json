@@ -9,7 +9,19 @@
       "Bash(uv pip:*)",
       "mcp__context7__resolve-library-id",
       "mcp__context7__get-library-docs",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git push:*)",
+      "Bash(lsof:*)",
+      "Bash(python -m uvicorn:*)",
+      "Bash(python3 -m uvicorn:*)",
+      "Bash(cat:*)",
+      "Bash(source .venv/bin/activate)",
+      "Bash(curl:*)",
+      "Bash(ls:*)",
+      "Bash(netstat:*)",
+      "Bash(git pull:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nchore: Update Claude settings with additional auto-approved commands\n\nAdd auto-approval for common development commands including git push, process inspection \\(lsof, netstat\\), uvicorn server, and basic utilities \\(cat, curl, ls\\).\n\n🤖 Generated with [Claude Code]\\(https://claude.com/claude-code\\)\n\nCo-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "mcp__github__get_me"
     ]
   }
 }
