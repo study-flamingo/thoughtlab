@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     neo4j_user: str
     neo4j_password: str
     database_url: str
-    redis_url: str
+    redis_url: str = "redis://localhost:6379"  # Optional - for caching
     
     # Security
     secret_key: str
@@ -22,6 +22,12 @@ class Settings(BaseSettings):
     environment: str = "development"
     cors_allow_origins: List[str] = [
         "http://localhost:5173",
+        "http://localhost:5174",
+        "http://localhost:5175",
+        "http://localhost:5176",
+        "http://localhost:5177",
+        "http://localhost:5178",
+        "http://localhost:5179",
         "http://localhost:3000",
     ]
     

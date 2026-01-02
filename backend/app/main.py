@@ -27,12 +27,24 @@ async def lifespan(app: FastAPI):
                 await asyncio.sleep(delay_s)
         if last_exc:
             raise last_exc
+
+    # Connect to Neo4j (required)
     await _retry(neo4j_conn.connect, "neo4j")
-    await _retry(redis_conn.connect, "redis")
+
+    # Connect to Redis (optional - for caching)
+    try:
+        await _retry(redis_conn.connect, "redis", attempts=1)
+    except Exception as e:
+        logging.warning(f"Redis not available: {e}. Continuing without cache.")
+
     yield
+
     # Shutdown
     await neo4j_conn.disconnect()
-    await redis_conn.disconnect()
+    try:
+        await redis_conn.disconnect()
+    except Exception:
+        pass  # Redis wasn't connected
     logging.info("Shutting down...")
 
 
@@ -100,17 +112,21 @@ async def health_check():
     except Exception as e:
         health_status["neo4j"] = f"unhealthy: {str(e)}"
     
-    # Check Redis
+    # Check Redis (optional)
     try:
-        await redis_conn.get_client().ping()
-        health_status["redis"] = "healthy"
+        if redis_conn.client is not None:
+            await redis_conn.get_client().ping()
+            health_status["redis"] = "healthy"
+        else:
+            health_status["redis"] = "not configured (optional)"
     except Exception as e:
-        health_status["redis"] = f"unhealthy: {str(e)}"
+        health_status["redis"] = f"not available: {str(e)}"
     
+    # Overall health check - Redis is optional, so ignore it for overall status
     overall = "healthy" if all(
         v == "healthy" or v == settings.environment
         for k, v in health_status.items()
-        if k != "environment"
-    ) else "degraded"
+        if k not in ("environment", "redis")
+    ) and health_status["neo4j"] == "healthy" else "degraded"
     
     return {"status": overall, "services": health_status}
