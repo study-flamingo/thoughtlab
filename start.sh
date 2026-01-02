@@ -4,6 +4,28 @@
 
 set -e
 
+# Ensure Git Bash utilities are in PATH (Windows Git Bash fix)
+if [[ "$OSTYPE" == "msys" ]] || [[ "$OSTYPE" == "cygwin" ]] || [[ "$OS" == "Windows_NT" ]]; then
+    export PATH="/usr/bin:$PATH"
+    # Additional common Git Bash paths
+    export PATH="/mingw64/bin:/mingw32/bin:$PATH"
+fi
+
+# Verify required commands are available
+check_command() {
+    if ! command -v "$1" &> /dev/null; then
+        echo "❌ Error: Required command '$1' not found."
+        echo "   Please ensure you're running this in Git Bash with Unix tools installed."
+        echo "   You may need to reinstall Git for Windows with Unix tools enabled."
+        exit 1
+    fi
+}
+
+# Only check critical commands that might be missing
+check_command dirname
+check_command sleep
+check_command grep
+
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RUN_DIR="$PROJECT_ROOT/.run"
 LOG_DIR="$RUN_DIR/logs"
@@ -86,6 +108,11 @@ if [ ! -d "node_modules" ]; then
     exit 1
 fi
 
+# Ensure port 5173 is free before starting (kill any stray processes)
+echo "🧹 Ensuring port 5173 is free..."
+"$PROJECT_ROOT/stop.sh" > /dev/null 2>&1 || true
+sleep 1
+
 # Start frontend in background
 FRONTEND_LOG="$LOG_DIR/frontend.log"
 echo "Frontend starting at http://localhost:5173"
@@ -110,9 +137,9 @@ FRONTEND_PORT=$(grep -o "localhost:[0-9]*" "$FRONTEND_LOG" 2>/dev/null | head -1
 FRONTEND_PORT=${FRONTEND_PORT:-5173}
 
 echo ""
-echo "════════════════════════════════════════════"
+echo "═══════════════════════════════════════════="
 echo "✅ All servers started successfully!"
-echo "════════════════════════════════════════════"
+echo "═══════════════════════════════════════════="
 echo ""
 echo "  Backend:  http://localhost:8000"
 echo "  Frontend: http://localhost:$FRONTEND_PORT"
@@ -120,7 +147,7 @@ echo ""
 echo "  Logs: $LOG_DIR/"
 echo ""
 echo "  Press Ctrl+C to stop all servers"
-echo "════════════════════════════════════════════"
+echo "═══════════════════════════════════════════="
 echo ""
 
 # Function to cleanup on exit
@@ -141,4 +168,3 @@ trap cleanup SIGINT SIGTERM EXIT
 
 # Tail logs to keep script running and show output
 tail -f "$BACKEND_LOG" "$FRONTEND_LOG" 2>/dev/null || wait
-
