@@ -23,31 +23,55 @@ Comprehensive guide for developers working on ThoughtLab, including architecture
 
 ### Prerequisites
 
-- **Python 3.11+** (pyenv recommended)
-- **Node.js 18+** (nvm recommended)
+- **Python 3.11+** (pyenv recommended on Linux/macOS, direct install on Windows)
+- **Node.js 18+** (nvm recommended on Linux/macOS, direct install on Windows)
 - **Docker & Docker Compose**
 - **uv** (Python package manager)
+- **PowerShell 5.1+** (Windows only - included with Windows 10+)
 
+**Install uv:**
+
+Linux/macOS/WSL:
 ```bash
-# Install uv
-curl -LsSf https://astral.sh/uv/install.sh | sh  # Linux/macOS/WSL
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+Windows PowerShell:
+```powershell
+powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
 ```
 
 ### One-Command Setup
 
+**Linux/macOS/WSL/Git Bash:**
 ```bash
-./setup.sh  # Linux/Mac/WSL/Git Bash
+./setup.sh
+```
+
+**Windows PowerShell:**
+```powershell
+.\scripts\setup.ps1
 ```
 
 This handles all setup: dependencies, environment files, Docker services, and database initialization.
 
 ### Start Development
 
+**Linux/macOS/WSL/Git Bash:**
 ```bash
 ./start.sh      # Start all services (backend + frontend)
 ./stop.sh       # Stop all services
 ./restart.sh    # Restart all services
 ```
+
+**Windows PowerShell (Recommended for Windows):**
+```powershell
+.\start.ps1     # Start all services (backend + frontend)
+.\stop.ps1      # Stop all services
+.\restart.ps1   # Restart all services
+```
+
+> **Note**: PowerShell scripts provide better process management on Windows than Git Bash scripts.
 
 ---
 
@@ -60,7 +84,7 @@ Frontend (React + TypeScript)
     ↓ HTTP/REST
 Backend (FastAPI + Python)
     ↓
-Neo4j (Graph DB) + Redis (Cache) + PostgreSQL (Users/Logs)
+Neo4j (Graph DB - Required) + Redis (Cache - Optional) + PostgreSQL (Users/Logs - Scaffolded)
     ↓
 AI Layer (LangChain + LangGraph + OpenAI)
 ```
@@ -69,21 +93,27 @@ AI Layer (LangChain + LangGraph + OpenAI)
 
 1. **Frontend**: React + TypeScript + Vite + Tailwind + React Query + Cytoscape.js
 2. **Backend**: FastAPI (async) with Pydantic models
-3. **Databases**: Neo4j (primary graph), Redis (cache/RT), PostgreSQL (scaffolded)
+3. **Databases**: Neo4j (primary graph - **required**), Redis (cache/RT - **optional**), PostgreSQL (scaffolded - **future**)
 4. **AI**: LangChain/LangGraph for embeddings, similarity search, and intelligent agents
 
 ### Key Architectural Decisions
 
 #### Database Strategy
 
-- **Neo4j**: Knowledge graph (nodes, relationships), vector indexes for embeddings
-- **Redis**: Caching, real-time features (future)
-- **PostgreSQL**: User accounts, activity logs, settings (scaffolded for future use)
+- **Neo4j** (Required): Knowledge graph (nodes, relationships), vector indexes for embeddings
+- **Redis** (Optional): Caching, real-time features when available - backend runs fine without it
+- **PostgreSQL** (Future): User accounts, activity logs, settings (scaffolded for future use)
 
 **Why Neo4j?**
 - Native graph operations optimize relationship traversal
 - Built-in vector indexing (5.13+) eliminates need for separate vector DB
 - Cypher query language perfect for "find paths" and "what connects X to Y" queries
+
+**Redis Optional Design:**
+- Backend starts successfully with only Neo4j running
+- Redis provides performance benefits (caching) when available
+- Health check shows Redis as "not configured (optional)" when unavailable
+- Overall system health does not depend on Redis
 
 #### Identifier Strategy
 
@@ -118,6 +148,20 @@ MATCH (n:Observation {id: $id}) RETURN n
 - Processing time exceeds 10 seconds regularly
 - Multi-user deployments show resource contention
 - Batch operations needed (re-analyze entire graph)
+
+#### CORS Configuration
+
+**Development Setup**: Backend allows frontend connections from multiple Vite dev server ports:
+- Explicit origins: `http://localhost:5173` through `http://localhost:5179`
+- Regex pattern: Any localhost or 127.0.0.1 with any port
+- Supports `strictPort: true` in Vite config (prevents auto-incrementing)
+
+**Why multiple ports?**
+- Vite auto-increments ports when 5173 is occupied
+- Range 5173-5179 covers common development scenarios
+- Prevents CORS errors during multi-developer scenarios or port conflicts
+
+**Production**: Configure CORS to allow only your specific frontend domain(s)
 
 ---
 
@@ -167,25 +211,31 @@ cd thoughtlab
 
 **Backend** (`backend/.env`):
 ```bash
-# Database
+# Database (Required)
 NEO4J_URI=bolt://localhost:7687
 NEO4J_USER=neo4j
 NEO4J_PASSWORD=research_graph_password
+
+# Cache (Optional - backend runs without Redis)
 REDIS_URL=redis://localhost:6379
 
 # Security
 SECRET_KEY=<generate-with-secrets.token_urlsafe(32)>
 
-# AI (optional but recommended)
+# AI (Optional but recommended for AI features)
 THOUGHTLAB_OPENAI_API_KEY=sk-...
 THOUGHTLAB_LLM_MODEL=gpt-4o-mini
 THOUGHTLAB_EMBEDDING_MODEL=text-embedding-3-small
 ```
 
+> **Note**: Only Neo4j is required. Backend starts successfully without Redis or OpenAI API keys.
+
 **Frontend** (`frontend/.env`):
 ```bash
 VITE_API_URL=http://localhost:8000/api/v1
 ```
+
+> **Note**: Frontend is configured with `strictPort: true` to always use port 5173. If port is occupied, Vite will fail with an error instead of auto-incrementing to 5174, 5175, etc.
 
 ### 3. Initialize Neo4j
 
@@ -217,13 +267,45 @@ OPTIONS {indexConfig: {
 
 ### 4. Run Development Servers
 
+**Option A - Use Start Scripts (Recommended):**
+
+Linux/macOS/WSL/Git Bash:
+```bash
+./start.sh      # Starts both backend and frontend
+```
+
+Windows PowerShell:
+```powershell
+.\start.ps1     # Starts both backend and frontend
+```
+
+**Option B - Manual Control (Better for Debugging):**
+
 **Terminal 1 - Backend**:
+
+Linux/macOS/WSL:
 ```bash
 cd backend
-source .venv/bin/activate  # Windows: .venv\Scripts\activate
+source .venv/bin/activate
 uvicorn app.main:app --reload
 # API: http://localhost:8000
 # Docs: http://localhost:8000/docs
+```
+
+Windows PowerShell:
+```powershell
+cd backend
+.venv\Scripts\Activate.ps1
+uvicorn app.main:app --reload
+# API: http://localhost:8000
+# Docs: http://localhost:8000/docs
+```
+
+Windows Git Bash:
+```bash
+cd backend
+source .venv/Scripts/activate
+uvicorn app.main:app --reload
 ```
 
 **Terminal 2 - Frontend**:
@@ -686,9 +768,21 @@ npm test -- --run  # Verify tests pass
 ### Backend Issues
 
 **Port 8000 already in use**:
+
+Linux/macOS/WSL:
 ```bash
 lsof -i :8000  # Find process
 kill -9 <PID>  # Kill it
+```
+
+Windows PowerShell:
+```powershell
+Get-NetTCPConnection -LocalPort 8000 | Select-Object -ExpandProperty OwningProcess | ForEach-Object { Stop-Process -Id $_ -Force }
+```
+
+Or use stop script:
+```powershell
+.\stop.ps1      # Kills all backend and frontend processes
 ```
 
 **Database connection errors**:
@@ -696,6 +790,12 @@ kill -9 <PID>  # Kill it
 docker-compose ps  # Check services are healthy
 docker-compose logs neo4j  # Check logs
 ```
+
+**Redis connection failed (Backend won't start)**:
+- **This should NOT happen anymore** - Redis is optional as of recent updates
+- If you see this error, you have an old backend process running
+- Solution: Run `.\stop.ps1` (Windows) or `./stop.sh` (Linux/macOS) and restart
+- Backend now shows "Redis: not configured (optional)" and continues without it
 
 **Module import errors**:
 ```bash
@@ -706,9 +806,36 @@ uv sync --all-extras  # Reinstall dependencies
 
 ### Frontend Issues
 
+**CORS errors (Access-Control-Allow-Origin header not present)**:
+1. **Verify backend is actually running**: Open http://localhost:8000/docs
+2. **Check backend logs**: You should see request logs when frontend loads
+3. **Kill orphaned processes**: Run `.\stop.ps1` (Windows) or `./stop.sh` (Linux/macOS)
+4. **Restart both servers**: Backend must be running for frontend to work
+5. **Check Vite port**: Frontend should be on port 5173 (or 5174-5179 if auto-incremented)
+6. **Verify CORS config**: Backend allows ports 5173-5179 by default
+
+**Port 5173 already in use**:
+
+Using stop script:
+```bash
+.\stop.ps1      # Windows PowerShell - kills ports 5173-5179
+./stop.sh       # Linux/macOS - kills port 5173
+```
+
+Manual kill (Windows):
+```powershell
+Get-NetTCPConnection -LocalPort 5173 | Select-Object -ExpandProperty OwningProcess | ForEach-Object { Stop-Process -Id $_ -Force }
+```
+
+Manual kill (Linux/macOS):
+```bash
+lsof -i :5173 | grep LISTEN | awk '{print $2}' | xargs kill -9
+```
+
 **API connection errors**:
 - Check backend is running: http://localhost:8000/health
 - Verify `VITE_API_URL` in `frontend/.env`
+- Ensure no CORS errors in browser console
 
 **Build errors**:
 ```bash
@@ -740,6 +867,33 @@ export THOUGHTLAB_OPENAI_API_KEY="sk-..."
 - Use `gpt-4o-mini` instead of `gpt-4o`
 - Reduce `max_iterations` in agent config
 
+### Windows-Specific Issues
+
+**PowerShell scripts won't run (execution policy)**:
+```powershell
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+```
+
+**Git Bash scripts fail to kill processes**:
+- **Solution**: Use PowerShell scripts instead (`.\start.ps1`, `.\stop.ps1`)
+- PowerShell provides more reliable process management on Windows
+- Git Bash has issues with Windows process termination
+
+**Backend changes not reflecting after restart**:
+- Old `uvicorn` processes may still be running
+- **Solution**: Use `.\stop.ps1` to ensure all Python processes are killed
+- Check Task Manager for orphaned `python.exe` processes
+
+**Vite incrementing to port 5174, 5175, etc.**:
+- Frontend config has `strictPort: true` to prevent this
+- If still happening, old Vite processes on 5173 are running
+- **Solution**: Run `.\stop.ps1` to kill all Vite processes on ports 5173-5179
+
+**"command not found" errors in Git Bash**:
+- Ensure Git Bash utilities are in PATH
+- Scripts add `/usr/bin` and `/mingw64/bin` automatically
+- If issues persist, use PowerShell scripts instead
+
 ---
 
 ## Additional Resources
@@ -762,4 +916,4 @@ export THOUGHTLAB_OPENAI_API_KEY="sk-..."
 
 ---
 
-**Last Updated**: 2026-01-02
+**Last Updated**: 2026-01-03
