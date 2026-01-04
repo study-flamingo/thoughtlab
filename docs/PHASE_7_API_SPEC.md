@@ -426,24 +426,30 @@ This document defines all backend API endpoints needed for LLM tool operations. 
 
 ---
 
-## Implementation Priority
+## Implementation Status
 
-### High Priority (Core LLM Tools)
+### High Priority (Core LLM Tools) - COMPLETE
 1. ✅ Find Related Nodes (leverage existing similarity search)
 2. ✅ Summarize Node
 3. ✅ Summarize Node with Context
 4. ✅ Recalculate Node Confidence
 5. ✅ Summarize Relationship
 
-### Medium Priority (Advanced Tools)
-6. ⚠️ Search Web for Evidence (requires external API)
-7. ⚠️ Recalculate Edge Confidence
-8. ⚠️ Reclassify Relationship
-9. ⚠️ Reclassify Node
+### Medium Priority (Advanced Tools) - COMPLETE
+6. ✅ Search Web for Evidence (placeholder - requires TAVILY_API_KEY)
+7. ✅ Recalculate Edge Confidence
+8. ✅ Reclassify Relationship
+9. ✅ Reclassify Node
 
-### Low Priority (Complex Operations)
-10. 🔄 Merge Nodes (requires confirmation system)
-11. 🔄 Pending Operation Confirmation/Denial
+### Low Priority (Complex Operations) - PARTIAL
+10. ✅ Merge Nodes (implemented without confirmation system)
+11. 🔄 Pending Operation Confirmation/Denial (not yet implemented)
+
+### Frontend Integration - COMPLETE
+- ✅ Toast notification system for tool results
+- ✅ AI Tools collapsible section in NodeInspector (6 tools)
+- ✅ AI Tools collapsible section in RelationInspector (3 tools)
+- ✅ API client methods for all 10 tools
 
 ---
 

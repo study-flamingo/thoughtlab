@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import GraphVisualizer from './components/GraphVisualizer';
 import ActivityFeed from './components/ActivityFeed';
 import NodeInspector from './components/NodeInspector';
@@ -6,6 +6,7 @@ import RelationInspector from './components/RelationInspector';
 import CreateNodeModal from './components/CreateNodeModal';
 import CreateRelationModal from './components/CreateRelationModal';
 import SettingsModal from './components/SettingsModal';
+import { ToastProvider } from './components/Toast';
 
 function App() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -35,6 +36,7 @@ function App() {
   }, []);
 
   return (
+    <ToastProvider>
     <div className="h-screen flex flex-col bg-gray-100 text-gray-900 dark:bg-gray-900 dark:text-gray-100">
       {/* Header */}
       <header className="bg-white shadow-sm border-b px-6 py-4 flex justify-between items-center dark:bg-gray-800 dark:border-gray-700">
@@ -104,6 +106,7 @@ function App() {
         <SettingsModal onClose={() => setIsSettingsOpen(false)} />
       )}
     </div>
+    </ToastProvider>
   );
 }
 

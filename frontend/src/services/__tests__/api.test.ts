@@ -302,4 +302,260 @@ describe('graphApi', () => {
       });
     });
   });
+
+  describe('AI Tools - Node Operations', () => {
+    it('findRelatedNodes calls correct endpoint with defaults', async () => {
+      mockPost.mockResolvedValue({
+        data: { success: true, related_nodes: [], message: 'Found 0 related nodes' },
+      });
+
+      await graphApi.findRelatedNodes('node-1');
+      expect(mockPost).toHaveBeenCalledWith('/tools/nodes/node-1/find-related', {});
+    });
+
+    it('findRelatedNodes calls with custom options', async () => {
+      mockPost.mockResolvedValue({
+        data: { success: true, related_nodes: [], message: 'Found 0 related nodes' },
+      });
+
+      await graphApi.findRelatedNodes('node-1', { limit: 5, min_similarity: 0.7 });
+      expect(mockPost).toHaveBeenCalledWith('/tools/nodes/node-1/find-related', {
+        limit: 5,
+        min_similarity: 0.7,
+      });
+    });
+
+    it('summarizeNode calls correct endpoint with defaults', async () => {
+      mockPost.mockResolvedValue({
+        data: { success: true, summary: 'Test summary', key_points: [], word_count: 10 },
+      });
+
+      await graphApi.summarizeNode('node-1');
+      expect(mockPost).toHaveBeenCalledWith('/tools/nodes/node-1/summarize', {});
+    });
+
+    it('summarizeNode calls with custom options', async () => {
+      mockPost.mockResolvedValue({
+        data: { success: true, summary: 'Test summary', key_points: [], word_count: 10 },
+      });
+
+      await graphApi.summarizeNode('node-1', { max_length: 100, style: 'bullet_points' });
+      expect(mockPost).toHaveBeenCalledWith('/tools/nodes/node-1/summarize', {
+        max_length: 100,
+        style: 'bullet_points',
+      });
+    });
+
+    it('summarizeNodeWithContext calls correct endpoint', async () => {
+      mockPost.mockResolvedValue({
+        data: {
+          success: true,
+          summary: 'Test summary',
+          context: { supports: [], contradicts: [], related: [] },
+          synthesis: 'Test synthesis',
+          relationship_count: 0,
+        },
+      });
+
+      await graphApi.summarizeNodeWithContext('node-1', { depth: 2 });
+      expect(mockPost).toHaveBeenCalledWith('/tools/nodes/node-1/summarize-with-context', {
+        depth: 2,
+      });
+    });
+
+    it('recalculateNodeConfidence calls correct endpoint', async () => {
+      mockPost.mockResolvedValue({
+        data: {
+          success: true,
+          old_confidence: 0.7,
+          new_confidence: 0.85,
+          reasoning: 'Test reasoning',
+          factors: [],
+        },
+      });
+
+      await graphApi.recalculateNodeConfidence('node-1');
+      expect(mockPost).toHaveBeenCalledWith('/tools/nodes/node-1/recalculate-confidence', {});
+    });
+
+    it('recalculateNodeConfidence calls with options', async () => {
+      mockPost.mockResolvedValue({
+        data: {
+          success: true,
+          old_confidence: 0.7,
+          new_confidence: 0.85,
+          reasoning: 'Test reasoning',
+          factors: [],
+        },
+      });
+
+      await graphApi.recalculateNodeConfidence('node-1', { factor_in_relationships: false });
+      expect(mockPost).toHaveBeenCalledWith('/tools/nodes/node-1/recalculate-confidence', {
+        factor_in_relationships: false,
+      });
+    });
+
+    it('reclassifyNode calls correct endpoint', async () => {
+      mockPost.mockResolvedValue({
+        data: {
+          success: true,
+          old_type: 'Observation',
+          new_type: 'Hypothesis',
+          properties_preserved: ['text'],
+          relationships_preserved: 2,
+          message: 'Reclassified',
+        },
+      });
+
+      await graphApi.reclassifyNode('node-1', { new_type: 'Hypothesis', preserve_relationships: true });
+      expect(mockPost).toHaveBeenCalledWith('/tools/nodes/node-1/reclassify', {
+        new_type: 'Hypothesis',
+        preserve_relationships: true,
+      });
+    });
+
+    it('searchWebEvidence calls correct endpoint', async () => {
+      mockPost.mockResolvedValue({
+        data: {
+          success: false,
+          results: [],
+          message: 'Web search not configured',
+          error: 'TAVILY_API_KEY not set',
+        },
+      });
+
+      await graphApi.searchWebEvidence('node-1');
+      expect(mockPost).toHaveBeenCalledWith('/tools/nodes/node-1/search-web-evidence', {});
+    });
+
+    it('searchWebEvidence calls with options', async () => {
+      mockPost.mockResolvedValue({
+        data: { success: false, results: [], message: 'Web search not configured' },
+      });
+
+      await graphApi.searchWebEvidence('node-1', { evidence_type: 'supporting', max_results: 10 });
+      expect(mockPost).toHaveBeenCalledWith('/tools/nodes/node-1/search-web-evidence', {
+        evidence_type: 'supporting',
+        max_results: 10,
+      });
+    });
+
+    it('mergeNodes calls correct endpoint', async () => {
+      mockPost.mockResolvedValue({
+        data: {
+          success: true,
+          primary_node_id: 'node-1',
+          secondary_node_id: 'node-2',
+          merged_properties: ['text'],
+          relationships_transferred: 3,
+          message: 'Nodes merged',
+        },
+      });
+
+      await graphApi.mergeNodes({
+        primary_node_id: 'node-1',
+        secondary_node_id: 'node-2',
+        merge_strategy: 'combine',
+      });
+      expect(mockPost).toHaveBeenCalledWith('/tools/nodes/merge', {
+        primary_node_id: 'node-1',
+        secondary_node_id: 'node-2',
+        merge_strategy: 'combine',
+      });
+    });
+  });
+
+  describe('AI Tools - Relationship Operations', () => {
+    it('summarizeRelationship calls correct endpoint', async () => {
+      mockPost.mockResolvedValue({
+        data: {
+          success: true,
+          edge_id: 'rel-1',
+          from_node: { id: 'node-1', type: 'Observation', content: 'Test' },
+          to_node: { id: 'node-2', type: 'Hypothesis', content: 'Test' },
+          relationship_type: 'SUPPORTS',
+          summary: 'Test summary',
+          evidence: [],
+          strength_assessment: 'strong',
+        },
+      });
+
+      await graphApi.summarizeRelationship('rel-1');
+      expect(mockPost).toHaveBeenCalledWith('/tools/relationships/rel-1/summarize', {});
+    });
+
+    it('summarizeRelationship calls with options', async () => {
+      mockPost.mockResolvedValue({
+        data: { success: true, summary: 'Test summary' },
+      });
+
+      await graphApi.summarizeRelationship('rel-1', { include_evidence: false });
+      expect(mockPost).toHaveBeenCalledWith('/tools/relationships/rel-1/summarize', {
+        include_evidence: false,
+      });
+    });
+
+    it('recalculateEdgeConfidence calls correct endpoint', async () => {
+      mockPost.mockResolvedValue({
+        data: {
+          success: true,
+          edge_id: 'rel-1',
+          old_confidence: 0.6,
+          new_confidence: 0.8,
+          reasoning: 'Test reasoning',
+          factors: [],
+        },
+      });
+
+      await graphApi.recalculateEdgeConfidence('rel-1');
+      expect(mockPost).toHaveBeenCalledWith('/tools/relationships/rel-1/recalculate-confidence', {});
+    });
+
+    it('recalculateEdgeConfidence calls with options', async () => {
+      mockPost.mockResolvedValue({
+        data: { success: true, old_confidence: 0.6, new_confidence: 0.8 },
+      });
+
+      await graphApi.recalculateEdgeConfidence('rel-1', { consider_graph_structure: false });
+      expect(mockPost).toHaveBeenCalledWith('/tools/relationships/rel-1/recalculate-confidence', {
+        consider_graph_structure: false,
+      });
+    });
+
+    it('reclassifyRelationship calls correct endpoint with explicit type', async () => {
+      mockPost.mockResolvedValue({
+        data: {
+          success: true,
+          edge_id: 'rel-1',
+          old_type: 'RELATES_TO',
+          new_type: 'SUPPORTS',
+          suggested_by_ai: false,
+          reasoning: 'Manual reclassification',
+          notes_preserved: true,
+        },
+      });
+
+      await graphApi.reclassifyRelationship('rel-1', { new_type: 'SUPPORTS' });
+      expect(mockPost).toHaveBeenCalledWith('/tools/relationships/rel-1/reclassify', {
+        new_type: 'SUPPORTS',
+      });
+    });
+
+    it('reclassifyRelationship calls correct endpoint for AI suggestion', async () => {
+      mockPost.mockResolvedValue({
+        data: {
+          success: true,
+          old_type: 'RELATES_TO',
+          new_type: 'SUPPORTS',
+          suggested_by_ai: true,
+          reasoning: 'AI determined SUPPORTS is more appropriate',
+        },
+      });
+
+      await graphApi.reclassifyRelationship('rel-1', { new_type: null });
+      expect(mockPost).toHaveBeenCalledWith('/tools/relationships/rel-1/reclassify', {
+        new_type: null,
+      });
+    });
+  });
 });

@@ -56,13 +56,14 @@ if [ ! -d ".venv" ]; then
     exit 1
 fi
 
-# Determine venv Python path
+# Determine venv Python path (use absolute path to ensure background process finds it)
+BACKEND_DIR="$(pwd)"
 if [ -f ".venv/bin/python" ]; then
-    VENV_PYTHON=".venv/bin/python"
+    VENV_PYTHON="$BACKEND_DIR/.venv/bin/python"
 elif [ -f ".venv/bin/python3" ]; then
-    VENV_PYTHON=".venv/bin/python3"
+    VENV_PYTHON="$BACKEND_DIR/.venv/bin/python3"
 elif [ -f ".venv/Scripts/python.exe" ]; then
-    VENV_PYTHON=".venv/Scripts/python.exe"
+    VENV_PYTHON="$BACKEND_DIR/.venv/Scripts/python.exe"
 else
     echo "❌ Could not find .venv Python"
     exit 1

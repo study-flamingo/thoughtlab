@@ -7,7 +7,87 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-No unreleased changes.
+### Added
+
+#### Tool Layer Architecture Refactor
+- **Modular Tool Service** (`backend/app/services/tools/`)
+  - `service.py` - ToolService facade class
+  - `base.py` - Shared infrastructure (config, LLM, Neo4j helpers)
+  - `operations/node_analysis.py` - find_related, summarize, confidence ops
+  - `operations/node_modification.py` - reclassify, merge, web_evidence ops
+  - `operations/relationship_analysis.py` - edge summarize, confidence, reclassify ops
+
+- **Shared Tool Definitions** (`backend/app/tools/`)
+  - `tool_definitions.py` - 12 tool definitions with metadata, parameters, execution modes
+  - `tool_registry.py` - Registry for MCP + LangGraph tool discovery
+  - Defines MCPExecutionMode (SYNC/ASYNC) and dangerous tool flags
+
+- **Job Queue & Report Storage**
+  - `backend/app/services/job_service.py` - Redis-based job queue for async operations
+  - `backend/app/services/report_service.py` - Redis storage for LangGraph results
+  - `backend/app/models/job_models.py` - Job and Report Pydantic models
+
+- **MCP Server Refactor**
+  - MCP server now mounted at `/mcp` in FastAPI app
+  - `backend/app/mcp/mcp_tools.py` - Tool wrappers calling ToolService directly (no HTTP)
+  - Dangerous tools gated by `THOUGHTLAB_MCP_ADMIN_MODE` env var
+
+- **LangGraph Agent Refactor**
+  - `backend/app/agents/agent_tools.py` - Tools calling ToolService directly (no HTTP)
+  - Results saved to ReportService for later viewing
+  - All 10 LangGraph tools now available
+
+- **Tool Models** (`backend/app/models/tool_models.py`)
+  - Centralized Pydantic request/response models for all AI tools
+
+#### LLM-Powered AI Tools (Phase 7)
+- **Toast Notification System** (`frontend/src/components/Toast.tsx`)
+  - ToastProvider context with `showToast(message, type, duration)`
+  - Four toast types: success (green), error (red), warning (amber), info (blue)
+  - Slide-in animation with auto-dismiss
+
+- **AI Tools Section Component** (`frontend/src/components/AIToolsSection.tsx`)
+  - Collapsible section with purple "AI Tools" header
+  - AIToolButton component with loading states
+
+- **Tool TypeScript Types** (`frontend/src/types/tools.ts`)
+  - Request/response types for all 10 tools
+
+- **Node Inspector AI Tools** (6 tools)
+  - Find Related Nodes - semantic similarity search
+  - Summarize - LLM-generated summary
+  - Summarize with Context - includes relationship context
+  - Recalculate Confidence - re-evaluates based on graph context
+  - Reclassify Node - change node type with dropdown selector
+  - Search Web for Evidence - placeholder (requires TAVILY_API_KEY)
+
+- **Relation Inspector AI Tools** (3 tools)
+  - Summarize Relationship - explains connection in plain language
+  - Recalculate Confidence - re-evaluates relationship strength
+  - Reclassify Relationship - change type with dropdown or AI suggestion
+
+- **New Backend Tool Endpoints** (`backend/app/api/routes/tools.py`)
+  - `POST /api/v1/tools/nodes/{id}/reclassify` - Change node type
+  - `POST /api/v1/tools/nodes/{id}/search-web-evidence` - Web search placeholder
+  - `POST /api/v1/tools/nodes/merge` - Merge two nodes
+  - `POST /api/v1/tools/relationships/{id}/recalculate-confidence` - Recalculate edge confidence
+  - `POST /api/v1/tools/relationships/{id}/reclassify` - Change relationship type
+
+- **Tool Service Methods** (`backend/app/services/tool_service.py`)
+  - `reclassify_node()` - Changes node label in Neo4j
+  - `search_web_evidence()` - Placeholder for Tavily integration
+  - `merge_nodes()` - Combines nodes and transfers relationships
+  - `recalculate_edge_confidence()` - LLM-based relationship strength evaluation
+  - `reclassify_relationship()` - Changes relationship type with AI suggestion option
+
+### Changed
+- **Architecture**: MCP and LangGraph now call ToolService directly (in-process, no HTTP)
+- **Architecture**: Tool definitions shared between MCP and LangGraph via registry
+- API client extended with 10 new tool methods
+- NodeInspector now includes AI Tools section with 6 tools
+- RelationInspector now includes AI Tools section with 3 tools
+- Tool capabilities endpoint updated to reflect all implemented tools
+- MCP server now accessible at `/mcp` endpoint with Streamable HTTP transport
 
 ---
 

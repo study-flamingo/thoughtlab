@@ -47,7 +47,7 @@ Keep documentation synchronized with code changes. When making changes, update:
 4. **[SETUP.md](./docs/SETUP.md)** - If setup process changes
 5. **[TESTING.md](./docs/TESTING.md)** - If testing approach changes
 6. **[README.md](./README.md)** - If features or quickstart instructions change
-
+7. **Context7** - When writing code that relies on 3rd party libraries, ALWAYS use context7 to see the latest docs.
 ---
 
 ## Development Principles

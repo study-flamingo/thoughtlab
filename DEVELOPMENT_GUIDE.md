@@ -379,13 +379,19 @@ npm run test:ui
 
 ## AI Integration
 
-ThoughtLab uses a **three-layer AI architecture** with complete separation of concerns:
+ThoughtLab uses a **three-layer AI architecture** with a shared core service:
 
 ```
-Claude Desktop → MCP Server → Backend API
-LangGraph Agent → ─────────→ Backend API
-Direct Access   → ─────────→ Backend API
+Claude Desktop → MCP Server (/mcp) ─┐
+LangGraph Agent ────────────────────┼→ ToolService (in-process)
+Frontend UI ─→ REST API (/api/v1) ──┘
 ```
+
+Both MCP and LangGraph call ToolService directly (in-process, no HTTP), sharing:
+- Tool definitions from `app/tools/tool_definitions.py`
+- Business logic from `app/services/tools/`
+- Job queue from `app/services/job_service.py` (for async operations)
+- Report storage from `app/services/report_service.py` (for LangGraph results)
 
 ### AI Capabilities
 
@@ -421,19 +427,22 @@ curl http://localhost:8000/api/v1/tools/health
 
 **Location**: `backend/app/agents/`
 
+**Key Files**:
+- `agent.py` - Agent creation with ReAct pattern
+- `agent_tools.py` - 10 tools calling ToolService directly (in-process)
+- `config.py` - Agent configuration
+- `state.py` - Agent state schema
+
 **Features**:
 - ReAct pattern for intelligent tool selection
-- 5 tools calling backend API via HTTP
-- Multi-step reasoning
-- Interactive and programmatic modes
+- 10 tools calling ToolService directly (no HTTP)
+- Results saved to ReportService for later viewing
+- Multi-step reasoning with automatic tool chaining
 
 **Usage**:
 ```bash
 cd backend
 python validate_agent.py
-
-# Interactive demo
-python examples/agent_demo.py --mode interactive
 
 # Programmatic
 from app.agents import create_thoughtlab_agent, run_agent
@@ -443,12 +452,18 @@ response = await run_agent(agent, "Find nodes related to obs-123")
 
 ### Layer 3: MCP Server
 
-**Location**: `backend/app/mcp/server.py`, `backend/mcp_server.py`
+**Location**: `backend/app/mcp/`
+
+**Key Files**:
+- `server.py` - MCP server setup with FastMCP
+- `mcp_tools.py` - Tool wrappers calling ToolService directly (in-process)
 
 **Features**:
-- 6 MCP tools for Claude Desktop integration
-- stdio transport
-- Same backend API as LangGraph
+- Mounted at `/mcp` endpoint with Streamable HTTP transport
+- 10+ MCP tools for Claude Desktop integration
+- Calls ToolService directly (no HTTP, same as LangGraph)
+- Dangerous tools gated by `THOUGHTLAB_MCP_ADMIN_MODE` env var
+- Uses shared tool definitions from `app/tools/tool_definitions.py`
 
 **Setup for Claude Desktop**:
 ```bash
@@ -462,6 +477,8 @@ fastmcp install claude-desktop mcp_server.py \
 ```bash
 cd backend
 python validate_mcp.py
+
+# Or access directly at /mcp endpoint when backend is running
 ```
 
 ### AI Configuration
@@ -496,6 +513,565 @@ When a new node is created:
 5. High confidence (≥0.8): Auto-create relationship
 6. Medium confidence (0.6-0.8): Create suggestion for user review
 7. Low confidence (<0.6): Discard
+
+### AI Tools Reference
+
+ThoughtLab provides 10 AI-powered tools for analyzing and modifying the knowledge graph. These tools are accessible via:
+- **Frontend UI**: Buttons in NodeInspector and RelationInspector
+- **REST API**: Direct HTTP calls to `/api/v1/tools/...`
+- **LangGraph Agent**: Programmatic agent invocation
+- **MCP Server**: Claude Desktop integration
+
+#### Node Analysis Tools
+
+##### 1. Find Related Nodes
+
+**Purpose**: Discover semantically similar nodes using vector embeddings.
+
+**Endpoint**: `POST /api/v1/tools/nodes/{node_id}/find-related`
+
+**Request Body**:
+```json
+{
+  "limit": 10,
+  "min_similarity": 0.5,
+  "node_types": ["Observation", "Hypothesis"],
+  "auto_link": false
+}
+```
+
+**Response**:
+```json
+{
+  "success": true,
+  "node_id": "obs-123",
+  "related_nodes": [
+    {
+      "id": "obs-456",
+      "type": "Observation",
+      "content": "Text preview...",
+      "similarity_score": 0.87,
+      "suggested_relationship": "RELATES_TO",
+      "reasoning": "Both discuss quantum entanglement..."
+    }
+  ],
+  "links_created": 0,
+  "message": "Found 5 related nodes"
+}
+```
+
+**How It Works**:
+1. Extracts content from the source node (text, description, title, or name field)
+2. Uses the node's embedding to query Neo4j vector index
+3. Filters results by `min_similarity` threshold and optional `node_types`
+4. For each candidate, LLM classifier suggests relationship type and reasoning
+5. If `auto_link: true`, automatically creates relationships for high-confidence matches
+
+**Frontend Location**: NodeInspector → AI Tools → "Find Related Nodes" button
+
+---
+
+##### 2. Summarize Node
+
+**Purpose**: Generate a concise AI summary of a node's content.
+
+**Endpoint**: `POST /api/v1/tools/nodes/{node_id}/summarize`
+
+**Request Body**:
+```json
+{
+  "max_length": 200,
+  "style": "concise"
+}
+```
+
+**Styles**: `"concise"` | `"detailed"` | `"bullet_points"`
+
+**Response**:
+```json
+{
+  "success": true,
+  "node_id": "obs-123",
+  "summary": "This observation discusses...",
+  "key_points": [
+    "Main finding about X",
+    "Secondary observation about Y"
+  ],
+  "word_count": 42
+}
+```
+
+**How It Works**:
+1. Extracts node content
+2. Constructs prompt based on style preference
+3. Calls LLM (GPT-4o-mini by default) to generate summary
+4. Extracts key points from summary or generates them separately
+
+**Frontend Location**: NodeInspector → AI Tools → "Summarize" button
+
+---
+
+##### 3. Summarize Node with Context
+
+**Purpose**: Generate a summary that includes information about connected nodes.
+
+**Endpoint**: `POST /api/v1/tools/nodes/{node_id}/summarize-with-context`
+
+**Request Body**:
+```json
+{
+  "depth": 1,
+  "relationship_types": ["SUPPORTS", "CONTRADICTS"],
+  "max_length": 300
+}
+```
+
+**Response**:
+```json
+{
+  "success": true,
+  "node_id": "hyp-789",
+  "summary": "This hypothesis proposes...",
+  "context": {
+    "supports": ["Observation obs-123: Evidence showing..."],
+    "contradicts": ["Source src-456: Study found opposite results..."],
+    "related": ["Concept con-789: Related to quantum mechanics..."]
+  },
+  "synthesis": "Overall, this hypothesis has strong support from 3 observations but conflicts with recent experimental data.",
+  "relationship_count": 7
+}
+```
+
+**How It Works**:
+1. Retrieves the node and all connected nodes within specified depth
+2. Categorizes connections by relationship type (supports, contradicts, related)
+3. Builds comprehensive prompt including node content and context
+4. LLM generates context-aware summary and synthesis
+
+**Frontend Location**: NodeInspector → AI Tools → "Summarize with Context" button
+
+---
+
+##### 4. Recalculate Node Confidence
+
+**Purpose**: Re-assess a node's confidence score based on content quality and graph context.
+
+**Endpoint**: `POST /api/v1/tools/nodes/{node_id}/recalculate-confidence`
+
+**Request Body**:
+```json
+{
+  "factor_in_relationships": true
+}
+```
+
+**Response**:
+```json
+{
+  "success": true,
+  "node_id": "obs-123",
+  "old_confidence": 0.7,
+  "new_confidence": 0.85,
+  "reasoning": "Confidence increased due to supporting evidence from 3 new sources",
+  "factors": [
+    {"factor": "Supporting evidence", "impact": "+0.1"},
+    {"factor": "Source credibility", "impact": "+0.05"}
+  ]
+}
+```
+
+**How It Works**:
+1. Retrieves current node and its confidence value
+2. If `factor_in_relationships: true`, counts supporting and contradicting relationships
+3. LLM evaluates content quality, clarity, and evidence support
+4. Parses LLM response for new confidence score and factors
+5. Updates node's confidence in Neo4j
+
+**Frontend Location**: NodeInspector → AI Tools → "Recalculate Confidence" button
+
+---
+
+##### 5. Reclassify Node
+
+**Purpose**: Change a node's type (e.g., Observation → Hypothesis).
+
+**Endpoint**: `POST /api/v1/tools/nodes/{node_id}/reclassify`
+
+**Request Body**:
+```json
+{
+  "new_type": "Hypothesis",
+  "preserve_relationships": true
+}
+```
+
+**Valid Types**: `"Observation"` | `"Hypothesis"` | `"Question"` | `"Source"` | `"Note"`
+
+**Response**:
+```json
+{
+  "success": true,
+  "node_id": "obs-123",
+  "old_type": "Observation",
+  "new_type": "Hypothesis",
+  "properties_preserved": ["text", "confidence", "created_at"],
+  "relationships_preserved": 5,
+  "message": "Successfully reclassified from Observation to Hypothesis"
+}
+```
+
+**How It Works**:
+1. Validates new type against allowed node types
+2. Retrieves current node and relationship count
+3. Updates Neo4j node label (removes old label, adds new label)
+4. Preserves all properties and relationships
+
+**Frontend Location**: NodeInspector → AI Tools → "Reclassify Node" dropdown
+
+---
+
+##### 6. Search Web for Evidence
+
+**Purpose**: Search the web for supporting or contradicting evidence (requires Tavily API key).
+
+**Endpoint**: `POST /api/v1/tools/nodes/{node_id}/search-web-evidence`
+
+**Request Body**:
+```json
+{
+  "evidence_type": "supporting",
+  "max_results": 5,
+  "auto_create_sources": false
+}
+```
+
+**Evidence Types**: `"supporting"` | `"contradicting"` | `"all"`
+
+**Response** (when configured):
+```json
+{
+  "success": true,
+  "node_id": "hyp-123",
+  "query_used": "evidence for: quantum entanglement in neurons",
+  "results": [
+    {
+      "title": "Recent findings on quantum entanglement",
+      "url": "https://example.com/paper",
+      "snippet": "Study confirms that...",
+      "relevance_score": 0.89
+    }
+  ],
+  "sources_created": 0,
+  "message": "Found 5 relevant results"
+}
+```
+
+**Response** (when not configured):
+```json
+{
+  "success": false,
+  "node_id": "hyp-123",
+  "message": "Web search not configured",
+  "error": "TAVILY_API_KEY environment variable not set"
+}
+```
+
+**How It Works**:
+1. Checks for `TAVILY_API_KEY` environment variable
+2. Extracts node content to build search query
+3. Calls Tavily API for web search (when configured)
+4. If `auto_create_sources: true`, creates Source nodes for results
+
+**Frontend Location**: NodeInspector → AI Tools → "Search Web for Evidence" button
+
+---
+
+##### 7. Merge Nodes
+
+**Purpose**: Combine two nodes of the same type into one, transferring relationships.
+
+**Endpoint**: `POST /api/v1/tools/nodes/merge`
+
+**Request Body**:
+```json
+{
+  "primary_node_id": "obs-123",
+  "secondary_node_id": "obs-456",
+  "merge_strategy": "combine"
+}
+```
+
+**Strategies**:
+- `"combine"`: Merge text content from both nodes (appends with separator)
+- `"keep_primary"`: Keep primary node's content, only transfer relationships
+- `"keep_secondary"`: Use secondary node's content, then transfer relationships
+- `"smart"`: Use AI to intelligently combine text content, preserving all data points and removing duplicates
+
+**Response**:
+```json
+{
+  "success": true,
+  "primary_node_id": "obs-123",
+  "secondary_node_id": "obs-456",
+  "merged_properties": ["text", "notes"],
+  "relationships_transferred": 3,
+  "message": "Successfully merged nodes. Transferred 3 relationships."
+}
+```
+
+**How It Works**:
+1. Validates both nodes exist and have the same type
+2. Merges properties based on strategy:
+   - `combine`: Appends text fields with `\n\n---\n\n` separator
+   - `keep_primary`: No property changes
+   - `keep_secondary`: Overwrites primary with secondary values
+   - `smart`: Uses LLM to intelligently merge text, preserving unique information and removing redundancy
+3. Transfers all relationships from secondary to primary node
+4. Deletes secondary node
+
+**Frontend Location**: NodeInspector → AI Tools → "Merge with Another Node" button (opens modal)
+
+---
+
+#### Relationship Analysis Tools
+
+##### 8. Summarize Relationship
+
+**Purpose**: Explain the connection between two nodes in plain language.
+
+**Endpoint**: `POST /api/v1/tools/relationships/{edge_id}/summarize`
+
+**Request Body**:
+```json
+{
+  "include_evidence": true
+}
+```
+
+**Response**:
+```json
+{
+  "success": true,
+  "edge_id": "rel-abc",
+  "from_node": {
+    "id": "obs-123",
+    "type": "Observation",
+    "content": "Particles showed entanglement..."
+  },
+  "to_node": {
+    "id": "hyp-456",
+    "type": "Hypothesis",
+    "content": "Quantum mechanics predicts..."
+  },
+  "relationship_type": "SUPPORTS",
+  "summary": "This observation provides experimental evidence that supports the hypothesis about quantum entanglement",
+  "evidence": [
+    "Direct measurement of entangled state",
+    "Results match theoretical predictions"
+  ],
+  "strength_assessment": "strong"
+}
+```
+
+**Strength Assessments**: `"strong"` (≥0.8) | `"moderate"` (0.6-0.8) | `"weak"` (<0.6)
+
+**How It Works**:
+1. Retrieves relationship and both connected nodes
+2. Extracts content from both nodes
+3. LLM generates explanation of the connection
+4. If `include_evidence: true`, extracts specific evidence points
+5. Assesses strength based on relationship confidence
+
+**Frontend Location**: RelationInspector → AI Tools → "Summarize Relationship" button
+
+---
+
+##### 9. Recalculate Edge Confidence
+
+**Purpose**: Re-evaluate relationship strength based on connected nodes and graph context.
+
+**Endpoint**: `POST /api/v1/tools/relationships/{edge_id}/recalculate-confidence`
+
+**Request Body**:
+```json
+{
+  "consider_graph_structure": true
+}
+```
+
+**Response**:
+```json
+{
+  "success": true,
+  "edge_id": "rel-abc",
+  "old_confidence": 0.6,
+  "new_confidence": 0.75,
+  "reasoning": "Relationship strengthened by additional supporting observations in the graph",
+  "factors": [
+    {"factor": "Content alignment", "impact": "good"},
+    {"factor": "Logical connection", "impact": "clear"}
+  ]
+}
+```
+
+**How It Works**:
+1. Retrieves relationship and both connected nodes
+2. If `consider_graph_structure: true`, counts relationships on both nodes
+3. LLM evaluates semantic connection between node contents
+4. Parses response for new confidence and contributing factors
+5. Updates relationship confidence in Neo4j
+
+**Frontend Location**: RelationInspector → AI Tools → "Recalculate Confidence" button
+
+---
+
+##### 10. Reclassify Relationship
+
+**Purpose**: Change relationship type or let AI suggest the best type.
+
+**Endpoint**: `POST /api/v1/tools/relationships/{edge_id}/reclassify`
+
+**Request Body**:
+```json
+{
+  "new_type": null,
+  "preserve_notes": true
+}
+```
+
+If `new_type` is `null`, AI suggests the best relationship type.
+
+**Valid Types**: `"SUPPORTS"` | `"CONTRADICTS"` | `"RELATES_TO"` | `"DERIVED_FROM"` | `"CITES"`
+
+**Response**:
+```json
+{
+  "success": true,
+  "edge_id": "rel-abc",
+  "old_type": "RELATES_TO",
+  "new_type": "SUPPORTS",
+  "suggested_by_ai": true,
+  "reasoning": "Analysis shows the source provides direct evidence for the hypothesis",
+  "notes_preserved": true
+}
+```
+
+**How It Works**:
+1. Retrieves relationship and both connected nodes
+2. If `new_type` is provided, uses that type
+3. If `new_type` is `null`, LLM analyzes both nodes and suggests best type
+4. Recreates relationship with new type (Neo4j doesn't allow in-place type changes)
+5. Preserves notes if requested
+
+**Frontend Location**: RelationInspector → AI Tools → "Reclassify Relationship" dropdown
+
+---
+
+#### Tool Health & Capabilities
+
+##### Health Check
+
+**Endpoint**: `GET /api/v1/tools/health`
+
+**Response**:
+```json
+{
+  "status": "healthy",
+  "ai_configured": true,
+  "llm_model": "gpt-4o-mini",
+  "embedding_model": "text-embedding-3-small"
+}
+```
+
+Status can be:
+- `"healthy"`: AI features fully available
+- `"degraded"`: AI not configured (missing OpenAI API key)
+
+---
+
+##### Capabilities List
+
+**Endpoint**: `GET /api/v1/tools/capabilities`
+
+**Response**:
+```json
+{
+  "node_analysis": [
+    {"operation": "find_related_nodes", "description": "Find semantically similar nodes"},
+    {"operation": "summarize_node", "description": "Generate AI summary"},
+    {"operation": "summarize_node_with_context", "description": "Summary including relationships"},
+    {"operation": "recalculate_confidence", "description": "Re-assess node confidence"}
+  ],
+  "node_modification": [
+    {"operation": "reclassify_node", "description": "Change node type"},
+    {"operation": "search_web_evidence", "description": "Search web for evidence"},
+    {"operation": "merge_nodes", "description": "Combine two nodes"}
+  ],
+  "relationship_analysis": [
+    {"operation": "summarize_relationship", "description": "Explain connection"},
+    {"operation": "recalculate_edge_confidence", "description": "Re-assess relationship strength"},
+    {"operation": "reclassify_relationship", "description": "Change relationship type"}
+  ]
+}
+```
+
+---
+
+#### Error Handling
+
+All tool endpoints follow consistent error patterns:
+
+**404 Not Found** (node/relationship doesn't exist):
+```json
+{
+  "detail": "Node not found"
+}
+```
+
+**400 Bad Request** (invalid parameters):
+```json
+{
+  "success": false,
+  "error": "Invalid parameters",
+  "message": "min_similarity must be between 0 and 1"
+}
+```
+
+**500 Internal Server Error** (LLM or database issues):
+```json
+{
+  "success": false,
+  "error": "OpenAI API error",
+  "message": "Rate limit exceeded"
+}
+```
+
+---
+
+#### Frontend Integration
+
+Tools are integrated into the UI via the `AIToolsSection` component:
+
+**NodeInspector** (6 tools):
+1. Find Related Nodes
+2. Summarize
+3. Summarize with Context
+4. Recalculate Confidence
+5. Reclassify Node (dropdown)
+6. Search Web for Evidence
+7. Merge with Another Node (opens modal)
+
+**RelationInspector** (3 tools):
+1. Summarize Relationship
+2. Recalculate Confidence
+3. Reclassify Relationship (dropdown with "Let AI Suggest" option)
+
+**UI Patterns**:
+- Tools show loading state while processing
+- All tools disabled when any tool is running (prevents conflicts)
+- Success/error messages shown via toast notifications
+- Dropdowns close on click-outside
+- Merge nodes shows confirmation modal with strategy selection
 
 ---
 
@@ -587,7 +1163,39 @@ Currently synchronous. When ARQ is needed:
 
 ### Adding New AI Tools
 
-1. **Backend Endpoint** (`backend/app/api/routes/tools.py`):
+ThoughtLab uses a unified tool architecture. To add a new tool:
+
+1. **Add Tool Definition** (`backend/app/tools/tool_definitions.py`):
+```python
+ToolDefinition(
+    name="new_operation",
+    description="Description for LLM",
+    parameters={
+        "node_id": {"type": "string", "required": True, "description": "Target node ID"},
+        # ... other parameters
+    },
+    category=ToolCategory.NODE_ANALYSIS,  # or NODE_MODIFICATION, RELATIONSHIP_ANALYSIS
+    execution_mode=MCPExecutionMode.SYNC,  # or ASYNC for long-running ops
+    is_dangerous=False,  # True if modifies data (requires confirmation)
+)
+```
+
+2. **Implement Service Logic** (`backend/app/services/tools/operations/`):
+```python
+# In node_analysis.py, node_modification.py, or relationship_analysis.py:
+async def new_operation(self, node_id: str, params: NewOpParams) -> dict:
+    """Implement the actual operation logic."""
+    # Use self.neo4j_driver, self.llm, self.embedding_model as needed
+    return {"success": True, ...}
+```
+
+3. **Add to ToolService Facade** (`backend/app/services/tools/service.py`):
+```python
+async def new_operation(self, node_id: str, params: NewOpParams) -> dict:
+    return await self._node_analysis.new_operation(node_id, params)
+```
+
+4. **Add API Endpoint** (`backend/app/api/routes/tools.py`):
 ```python
 @router.post("/tools/nodes/{node_id}/new-operation")
 async def new_operation(node_id: str, params: NewOpParams):
@@ -595,30 +1203,25 @@ async def new_operation(node_id: str, params: NewOpParams):
     return result
 ```
 
-2. **Service Implementation** (`backend/app/services/tool_service.py`):
-```python
-async def new_operation(node_id: str, params: NewOpParams):
-    # Implement logic using graph_service, AI, etc.
-    return {"success": True, ...}
-```
-
-3. **LangGraph Tool** (`backend/app/agents/tools.py`):
+5. **Add to LangGraph Agent Tools** (`backend/app/agents/agent_tools.py`):
 ```python
 @tool
-async def new_operation(node_id: str, ...):
-    """Tool description for LLM"""
-    result = await http_client.post(f"/tools/nodes/{node_id}/new-operation", ...)
+async def new_operation(node_id: str, ...) -> str:
+    """Tool description for LLM."""
+    result = await tool_service.new_operation(node_id, ...)
+    report_service.save_report(...)  # Optional: save results
     return format_result(result)
 ```
 
-4. **MCP Tool** (`backend/app/mcp/server.py`):
+6. **Add to MCP Tools** (`backend/app/mcp/mcp_tools.py`):
+The tool is automatically registered from tool_definitions.py. Just add the result formatter:
 ```python
-@mcp.tool()
-async def new_operation(node_id: str, ...):
-    """Tool description"""
-    result = await http_client.post(f"/tools/nodes/{node_id}/new-operation", ...)
-    return format_result(result)
+def _format_new_operation_result(result: dict) -> str:
+    """Format result for Claude Desktop display."""
+    return f"Result: {result['message']}"
 ```
+
+The key benefit: Tool definitions, parameters, and descriptions are shared across REST API, LangGraph, and MCP.
 
 ### Integrating External Services
 

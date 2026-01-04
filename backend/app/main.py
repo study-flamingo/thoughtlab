@@ -7,6 +7,7 @@ from app.core.config import settings
 from app.db.neo4j import neo4j_conn
 from app.db.redis import redis_conn
 from app.api.routes import nodes, graph, settings as settings_routes, activities, tools
+from app.mcp import create_mcp_server
 from typing import Callable, Awaitable
 
 
@@ -89,6 +90,14 @@ app.include_router(graph.router, prefix="/api/v1")
 app.include_router(settings_routes.router, prefix="/api/v1")
 app.include_router(activities.router, prefix="/api/v1")
 app.include_router(tools.router, prefix="/api/v1")
+
+# Mount MCP server at /mcp for Streamable HTTP access
+try:
+    mcp_server = create_mcp_server()
+    app.mount("/mcp", mcp_server.http_app())
+    logging.info("MCP server mounted at /mcp")
+except Exception as e:
+    logging.warning(f"Failed to mount MCP server: {e}")
 
 
 @app.get("/health")

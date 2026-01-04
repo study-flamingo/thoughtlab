@@ -1,7 +1,7 @@
-import { useRef, useEffect, useState, useMemo } from 'react';
+import { useRef, useEffect, useState, useMemo, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import CytoscapeComponent from 'react-cytoscapejs';
-import cytoscape, { type Core } from 'cytoscape';
+import { type Core } from 'cytoscape';
 import { graphApi } from '../services/api';
 import type { GraphNode, GraphEdge, NodeType } from '../types/graph';
 import type { AppSettings, RelationStyle } from '../types/settings';
@@ -24,11 +24,11 @@ function buildStylesheet(settings?: AppSettings, isDarkMode?: boolean) {
     };
 
   const base: any[] = [
-    // Canvas/core background
+    // Canvas/core background - transparent so custom grid canvas shows through
     {
       selector: 'core',
       style: {
-        'background-color': isDarkMode ? '#111827' : '#ffffff', // gray-900 vs white
+        'background-color': 'transparent',
       },
     },
     {
@@ -99,13 +99,14 @@ interface Props {
   selectedEdgeId?: string | null;
 }
 
-export default function GraphVisualizer({ 
-  onNodeSelect, 
+export default function GraphVisualizer({
+  onNodeSelect,
   selectedNodeId: externalSelectedNodeId,
   onEdgeSelect,
   selectedEdgeId: externalSelectedEdgeId,
 }: Props) {
   const cyRef = useRef<Core | null>(null);
+  const gridCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const [isReady, setIsReady] = useState<boolean>(false);
   const setupDoneRef = useRef<boolean>(false);
   const onNodeSelectRef = useRef(onNodeSelect);
@@ -370,6 +371,83 @@ export default function GraphVisualizer({
     }
   }, [selectedEdgeId, selectedNodeId, isReady, data]);
 
+  // Draw grid on canvas that follows pan/zoom
+  const drawGrid = useCallback(() => {
+    const cy = cyRef.current;
+    const canvas = gridCanvasRef.current;
+    if (!cy || !canvas || cy.destroyed()) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // Get canvas dimensions
+    const container = canvas.parentElement;
+    if (!container) return;
+
+    const width = container.clientWidth;
+    const height = container.clientHeight;
+
+    // Update canvas size if needed
+    if (canvas.width !== width || canvas.height !== height) {
+      canvas.width = width;
+      canvas.height = height;
+    }
+
+    // Clear canvas
+    ctx.clearRect(0, 0, width, height);
+
+    // Get pan and zoom from cytoscape
+    const pan = cy.pan();
+    const zoom = cy.zoom();
+    const gridSpacing = 20;
+
+    // Calculate grid offset based on pan
+    const offsetX = pan.x % (gridSpacing * zoom);
+    const offsetY = pan.y % (gridSpacing * zoom);
+
+    // Set grid style
+    ctx.fillStyle = isDarkMode ? '#374151' : '#D1D5DB';
+
+    // Draw dots
+    const dotSize = 1.5;
+    for (let x = offsetX; x < width; x += gridSpacing * zoom) {
+      for (let y = offsetY; y < height; y += gridSpacing * zoom) {
+        ctx.beginPath();
+        ctx.arc(x, y, dotSize, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+  }, [isDarkMode]);
+
+  // Set up grid drawing on pan/zoom events
+  useEffect(() => {
+    const cy = cyRef.current;
+    if (!cy || !isReady || cy.destroyed()) return;
+
+    // Initial draw
+    drawGrid();
+
+    // Listen for pan/zoom events
+    const handleViewport = () => drawGrid();
+    cy.on('pan zoom resize', handleViewport);
+
+    // Also redraw on window resize
+    const handleResize = () => drawGrid();
+    window.addEventListener('resize', handleResize);
+
+    return () => {
+      if (cy && !cy.destroyed()) {
+        cy.off('pan zoom resize', handleViewport);
+      }
+      window.removeEventListener('resize', handleResize);
+    };
+  }, [isReady, drawGrid]);
+
+  // Redraw grid when dark mode changes
+  useEffect(() => {
+    drawGrid();
+  }, [isDarkMode, drawGrid]);
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
@@ -485,7 +563,20 @@ export default function GraphVisualizer({
       </div>
 
       {/* Cytoscape Graph */}
-      <div className="flex-1 relative">
+      <div className="flex-1 relative" style={{ backgroundColor: isDarkMode ? '#111827' : '#ffffff' }}>
+        {/* Grid canvas layer - positioned behind Cytoscape */}
+        <canvas
+          ref={gridCanvasRef}
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
+            pointerEvents: 'none',
+            zIndex: 0,
+          }}
+        />
         <CytoscapeComponent
           elements={elements}
           stylesheet={stylesheet as any}
@@ -505,7 +596,7 @@ export default function GraphVisualizer({
             gravityRange: 3.8,
             initialEnergyOnIncremental: 0.3,
           }}
-          style={{ width: '100%', height: '100%' }}
+          style={{ width: '100%', height: '100%', position: 'relative', zIndex: 1 }}
           cy={(cy: Core) => {
             if (!cy) {
               setIsReady(false);
@@ -530,7 +621,7 @@ export default function GraphVisualizer({
               setIsReady(false);
             }
 
-            const setupCytoscape = () => {
+            const setupCytoscape = async () => {
               try {
                 if (cy.destroyed() || setupDoneRef.current) {
                   return;
@@ -541,6 +632,8 @@ export default function GraphVisualizer({
                 cy.zoomingEnabled(true);
                 cy.minZoom(0.1);
                 cy.maxZoom(2);
+
+                // Grid is now drawn via custom canvas layer (see drawGrid callback)
 
                 setupDoneRef.current = true;
                 setIsReady(true);

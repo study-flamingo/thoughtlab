@@ -10,55 +10,35 @@ All endpoints are stateless and independently testable.
 """
 
 from fastapi import APIRouter, HTTPException, Body
-from pydantic import BaseModel, Field
-from typing import Optional, List, Literal
 
-from app.services.tool_service import (
-    get_tool_service,
+from app.services.tools import get_tool_service
+from app.models.tool_models import (
+    # Request models
+    FindRelatedNodesRequest,
+    SummarizeNodeRequest,
+    SummarizeNodeWithContextRequest,
+    RecalculateConfidenceRequest,
+    SummarizeRelationshipRequest,
+    ReclassifyNodeRequest,
+    SearchWebEvidenceRequest,
+    RecalculateEdgeConfidenceRequest,
+    ReclassifyRelationshipRequest,
+    MergeNodesRequest,
+    # Response models
     FindRelatedNodesResponse,
     SummarizeNodeResponse,
     SummarizeNodeWithContextResponse,
     RecalculateConfidenceResponse,
     SummarizeRelationshipResponse,
+    ReclassifyNodeResponse,
+    SearchWebEvidenceResponse,
+    RecalculateEdgeConfidenceResponse,
+    ReclassifyRelationshipResponse,
+    MergeNodesResponse,
 )
 
 router = APIRouter(prefix="/tools", tags=["tools"])
 tool_service = get_tool_service()
-
-
-# ============================================================================
-# Request Models
-# ============================================================================
-
-class FindRelatedNodesRequest(BaseModel):
-    """Request for finding related nodes."""
-    limit: int = Field(default=10, ge=1, le=50)
-    min_similarity: float = Field(default=0.5, ge=0.0, le=1.0)
-    node_types: Optional[List[str]] = None
-    auto_link: bool = False
-
-
-class SummarizeNodeRequest(BaseModel):
-    """Request for summarizing a node."""
-    max_length: int = Field(default=200, ge=50, le=1000)
-    style: Literal["concise", "detailed", "bullet_points"] = "concise"
-
-
-class SummarizeNodeWithContextRequest(BaseModel):
-    """Request for summarizing a node with context."""
-    depth: int = Field(default=1, ge=1, le=2)
-    relationship_types: Optional[List[str]] = None
-    max_length: int = Field(default=300, ge=100, le=1000)
-
-
-class RecalculateConfidenceRequest(BaseModel):
-    """Request for recalculating node confidence."""
-    factor_in_relationships: bool = True
-
-
-class SummarizeRelationshipRequest(BaseModel):
-    """Request for summarizing a relationship."""
-    include_evidence: bool = True
 
 
 # ============================================================================
@@ -234,6 +214,134 @@ async def recalculate_node_confidence(
 
 
 # ============================================================================
+# Node Modification Endpoints
+# ============================================================================
+
+@router.post("/nodes/{node_id}/reclassify", response_model=ReclassifyNodeResponse)
+async def reclassify_node(
+    node_id: str,
+    request: ReclassifyNodeRequest = Body(...),
+) -> ReclassifyNodeResponse:
+    """Reclassify a node to a different type.
+
+    This endpoint:
+    - Changes the node's type/label
+    - Preserves all properties
+    - Optionally preserves relationships
+
+    Args:
+        node_id: The node to reclassify
+        request: Reclassification parameters
+
+    Returns:
+        Result with old type, new type, and preserved items
+
+    Example:
+        POST /api/v1/tools/nodes/obs-123/reclassify
+        {
+            "new_type": "Hypothesis",
+            "preserve_relationships": true
+        }
+    """
+    result = await tool_service.reclassify_node(
+        node_id=node_id,
+        new_type=request.new_type,
+        preserve_relationships=request.preserve_relationships,
+    )
+
+    if not result.success and result.error:
+        status_code = 404 if "not found" in result.error.lower() else 400 if "invalid" in result.error.lower() else 500
+        raise HTTPException(status_code=status_code, detail=result.error)
+
+    return result
+
+
+@router.post(
+    "/nodes/{node_id}/search-web-evidence",
+    response_model=SearchWebEvidenceResponse
+)
+async def search_web_evidence(
+    node_id: str,
+    request: SearchWebEvidenceRequest = Body(...),
+) -> SearchWebEvidenceResponse:
+    """Search the web for evidence related to a node.
+
+    Note: This endpoint requires TAVILY_API_KEY to be configured.
+    Without it, returns a placeholder message.
+
+    This endpoint:
+    - Extracts content from the node
+    - Searches the web for related evidence
+    - Optionally creates Source nodes from results
+
+    Args:
+        node_id: The node to find evidence for
+        request: Search parameters
+
+    Returns:
+        Search results with titles, URLs, and snippets
+
+    Example:
+        POST /api/v1/tools/nodes/hyp-456/search-web-evidence
+        {
+            "evidence_type": "supporting",
+            "max_results": 5,
+            "auto_create_sources": false
+        }
+    """
+    result = await tool_service.search_web_evidence(
+        node_id=node_id,
+        evidence_type=request.evidence_type,
+        max_results=request.max_results,
+        auto_create_sources=request.auto_create_sources,
+    )
+
+    # Note: We don't raise HTTPException for "not configured" - it's a valid response
+    if not result.success and result.error and "not found" in result.error.lower():
+        raise HTTPException(status_code=404, detail=result.error)
+
+    return result
+
+
+@router.post("/nodes/merge", response_model=MergeNodesResponse)
+async def merge_nodes(
+    request: MergeNodesRequest = Body(...),
+) -> MergeNodesResponse:
+    """Merge two nodes into one.
+
+    This endpoint:
+    - Combines properties from both nodes based on strategy
+    - Transfers all relationships from secondary to primary
+    - Deletes the secondary node
+
+    Args:
+        request: Merge parameters including both node IDs and strategy
+
+    Returns:
+        Result with merged properties and transferred relationships
+
+    Example:
+        POST /api/v1/tools/nodes/merge
+        {
+            "primary_node_id": "obs-123",
+            "secondary_node_id": "obs-456",
+            "merge_strategy": "combine"
+        }
+    """
+    result = await tool_service.merge_nodes(
+        primary_node_id=request.primary_node_id,
+        secondary_node_id=request.secondary_node_id,
+        merge_strategy=request.merge_strategy,
+    )
+
+    if not result.success and result.error:
+        status_code = 404 if "not found" in result.error.lower() else 400 if "mismatch" in result.error.lower() else 500
+        raise HTTPException(status_code=status_code, detail=result.error)
+
+    return result
+
+
+# ============================================================================
 # Relationship Analysis Endpoints
 # ============================================================================
 
@@ -269,6 +377,96 @@ async def summarize_relationship(
     result = await tool_service.summarize_relationship(
         edge_id=edge_id,
         include_evidence=request.include_evidence,
+    )
+
+    if not result.success and result.error:
+        status_code = 404 if "not found" in result.error.lower() else 500
+        raise HTTPException(status_code=status_code, detail=result.error)
+
+    return result
+
+
+@router.post(
+    "/relationships/{edge_id}/recalculate-confidence",
+    response_model=RecalculateEdgeConfidenceResponse
+)
+async def recalculate_edge_confidence(
+    edge_id: str,
+    request: RecalculateEdgeConfidenceRequest = Body(...),
+) -> RecalculateEdgeConfidenceResponse:
+    """Recalculate a relationship's confidence based on connected nodes.
+
+    This endpoint:
+    - Analyzes the content of both connected nodes
+    - Evaluates how well they support the relationship type
+    - Uses LLM to determine confidence level
+    - Updates the confidence value in the database
+
+    Args:
+        edge_id: The relationship ID to recalculate confidence for
+        request: Recalculation parameters
+
+    Returns:
+        Old and new confidence scores with reasoning
+
+    Example:
+        POST /api/v1/tools/relationships/rel-abc/recalculate-confidence
+        {
+            "consider_graph_structure": true
+        }
+    """
+    result = await tool_service.recalculate_edge_confidence(
+        edge_id=edge_id,
+        consider_graph_structure=request.consider_graph_structure,
+    )
+
+    if not result.success and result.error:
+        status_code = 404 if "not found" in result.error.lower() else 500
+        raise HTTPException(status_code=status_code, detail=result.error)
+
+    return result
+
+
+@router.post(
+    "/relationships/{edge_id}/reclassify",
+    response_model=ReclassifyRelationshipResponse
+)
+async def reclassify_relationship(
+    edge_id: str,
+    request: ReclassifyRelationshipRequest = Body(...),
+) -> ReclassifyRelationshipResponse:
+    """Reclassify a relationship to a different type.
+
+    This endpoint:
+    - Changes the relationship type
+    - Optionally lets AI suggest the best type
+    - Preserves notes and confidence if requested
+
+    Args:
+        edge_id: The relationship to reclassify
+        request: Reclassification parameters
+
+    Returns:
+        Result with old type, new type, and reasoning
+
+    Example:
+        POST /api/v1/tools/relationships/rel-abc/reclassify
+        {
+            "new_type": "SUPPORTS",
+            "preserve_notes": true
+        }
+
+        Or let AI suggest:
+        POST /api/v1/tools/relationships/rel-abc/reclassify
+        {
+            "new_type": null,
+            "preserve_notes": true
+        }
+    """
+    result = await tool_service.reclassify_relationship(
+        edge_id=edge_id,
+        new_type=request.new_type,
+        preserve_notes=request.preserve_notes,
     )
 
     if not result.success and result.error:
@@ -329,6 +527,23 @@ async def list_capabilities():
                 "endpoint": "POST /tools/nodes/{node_id}/recalculate-confidence",
                 "description": "Re-analyze node confidence based on graph context"
             },
+            {
+                "operation": "reclassify_node",
+                "endpoint": "POST /tools/nodes/{node_id}/reclassify",
+                "description": "Change a node's type (Observation, Hypothesis, etc.)"
+            },
+            {
+                "operation": "search_web_evidence",
+                "endpoint": "POST /tools/nodes/{node_id}/search-web-evidence",
+                "description": "Search the web for evidence (requires TAVILY_API_KEY)"
+            },
+        ],
+        "node_modification": [
+            {
+                "operation": "merge_nodes",
+                "endpoint": "POST /tools/nodes/merge",
+                "description": "Merge two nodes into one, transferring relationships"
+            },
         ],
         "relationship_analysis": [
             {
@@ -336,12 +551,15 @@ async def list_capabilities():
                 "endpoint": "POST /tools/relationships/{edge_id}/summarize",
                 "description": "Explain connection between nodes in plain language"
             },
+            {
+                "operation": "recalculate_edge_confidence",
+                "endpoint": "POST /tools/relationships/{edge_id}/recalculate-confidence",
+                "description": "Re-analyze relationship confidence based on connected nodes"
+            },
+            {
+                "operation": "reclassify_relationship",
+                "endpoint": "POST /tools/relationships/{edge_id}/reclassify",
+                "description": "Change relationship type (SUPPORTS, CONTRADICTS, etc.)"
+            },
         ],
-        "coming_soon": [
-            "search_web_for_evidence",
-            "recalculate_edge_confidence",
-            "reclassify_relationship",
-            "reclassify_node",
-            "merge_nodes",
-        ]
     }

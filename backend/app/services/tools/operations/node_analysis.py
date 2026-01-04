@@ -1,159 +1,32 @@
-"""Tool service for LLM-powered graph operations.
+"""Node analysis operations.
 
-This service provides on-demand operations that can be invoked by:
-- LangGraph agents (via API)
-- Frontend (via API)
-- MCP server (via API)
-- CLI tools (via API)
-
-All operations are designed to be stateless and independently testable.
+Operations for analyzing nodes in the knowledge graph:
+- Find related nodes via semantic similarity
+- Summarize node content
+- Summarize with relationship context
+- Recalculate confidence based on graph context
 """
 
-from typing import Optional, List, Dict, Any, Literal
-from pydantic import BaseModel, Field
+from typing import Optional, List, Literal
 import logging
 
-from app.ai.config import get_ai_config
-from app.ai.similarity import get_similarity_search
-from app.ai.classifier import get_relationship_classifier
+from app.services.tools.base import ToolServiceBase
 from app.services.graph_service import graph_service
-from app.db.neo4j import neo4j_conn
-from langchain_openai import ChatOpenAI
+from app.models.tool_models import (
+    RelatedNodeResult,
+    NodeContextSummary,
+    ConfidenceFactor,
+    FindRelatedNodesResponse,
+    SummarizeNodeResponse,
+    SummarizeNodeWithContextResponse,
+    RecalculateConfidenceResponse,
+)
 
 logger = logging.getLogger(__name__)
 
 
-# ============================================================================
-# Response Models
-# ============================================================================
-
-class RelatedNodeResult(BaseModel):
-    """A single related node result."""
-    id: str
-    type: str
-    content: str
-    similarity_score: float
-    suggested_relationship: str
-    reasoning: str
-
-
-class FindRelatedNodesResponse(BaseModel):
-    """Response for find_related_nodes operation."""
-    success: bool
-    node_id: str
-    related_nodes: List[RelatedNodeResult]
-    links_created: int = 0
-    message: str
-    error: Optional[str] = None
-
-
-class SummarizeNodeResponse(BaseModel):
-    """Response for summarize_node operation."""
-    success: bool
-    node_id: str
-    summary: str
-    key_points: List[str]
-    word_count: int
-    error: Optional[str] = None
-
-
-class NodeContextSummary(BaseModel):
-    """Context summary for a node."""
-    supports: List[str] = Field(default_factory=list)
-    contradicts: List[str] = Field(default_factory=list)
-    related: List[str] = Field(default_factory=list)
-
-
-class SummarizeNodeWithContextResponse(BaseModel):
-    """Response for summarize_node_with_context operation."""
-    success: bool
-    node_id: str
-    summary: str
-    context: NodeContextSummary
-    synthesis: str
-    relationship_count: int
-    error: Optional[str] = None
-
-
-class ConfidenceFactor(BaseModel):
-    """A factor affecting confidence calculation."""
-    factor: str
-    impact: str
-
-
-class RecalculateConfidenceResponse(BaseModel):
-    """Response for recalculate_node_confidence operation."""
-    success: bool
-    node_id: str
-    old_confidence: float
-    new_confidence: float
-    reasoning: str
-    factors: List[ConfidenceFactor]
-    error: Optional[str] = None
-
-
-class NodeInfo(BaseModel):
-    """Node information for relationship summary."""
-    id: str
-    type: str
-    content: str
-
-
-class SummarizeRelationshipResponse(BaseModel):
-    """Response for summarize_relationship operation."""
-    success: bool
-    edge_id: str
-    from_node: NodeInfo
-    to_node: NodeInfo
-    relationship_type: str
-    summary: str
-    evidence: List[str]
-    strength_assessment: Literal["strong", "moderate", "weak"]
-    error: Optional[str] = None
-
-
-# ============================================================================
-# Tool Service
-# ============================================================================
-
-class ToolService:
-    """Service for LLM-powered graph operations."""
-
-    def __init__(self):
-        """Initialize tool service."""
-        self.config = get_ai_config()
-        self._similarity_search = None
-        self._classifier = None
-        self._llm = None
-
-    @property
-    def similarity_search(self):
-        """Lazy initialization of similarity search."""
-        if self._similarity_search is None:
-            self._similarity_search = get_similarity_search()
-        return self._similarity_search
-
-    @property
-    def classifier(self):
-        """Lazy initialization of relationship classifier."""
-        if self._classifier is None:
-            self._classifier = get_relationship_classifier()
-        return self._classifier
-
-    @property
-    def llm(self):
-        """Lazy initialization of LLM for summarization."""
-        if self._llm is None:
-            self._llm = ChatOpenAI(
-                model=self.config.llm_model,
-                openai_api_key=self.config.openai_api_key,
-                temperature=0.3,  # Slightly creative for summaries
-            )
-        return self._llm
-
-    # ========================================================================
-    # Node Analysis Operations
-    # ========================================================================
+class NodeAnalysisOperations(ToolServiceBase):
+    """Operations for analyzing nodes in the knowledge graph."""
 
     async def find_related_nodes(
         self,
@@ -177,7 +50,7 @@ class ToolService:
         """
         try:
             # Get the source node
-            node = await self._get_node_by_id(node_id)
+            node = await self.get_node_by_id(node_id)
             if not node:
                 return FindRelatedNodesResponse(
                     success=False,
@@ -188,7 +61,7 @@ class ToolService:
                 )
 
             # Extract content for similarity search
-            content = self._extract_node_content(node)
+            content = self.extract_node_content(node)
             if not content:
                 return FindRelatedNodesResponse(
                     success=False,
@@ -284,7 +157,7 @@ class ToolService:
         """
         try:
             # Get the node
-            node = await self._get_node_by_id(node_id)
+            node = await self.get_node_by_id(node_id)
             if not node:
                 return SummarizeNodeResponse(
                     success=False,
@@ -296,7 +169,7 @@ class ToolService:
                 )
 
             # Extract content
-            content = self._extract_node_content(node)
+            content = self.extract_node_content(node)
             if not content:
                 return SummarizeNodeResponse(
                     success=False,
@@ -402,7 +275,7 @@ Key points:
         """
         try:
             # Get the node
-            node = await self._get_node_by_id(node_id)
+            node = await self.get_node_by_id(node_id)
             if not node:
                 return SummarizeNodeWithContextResponse(
                     success=False,
@@ -415,7 +288,7 @@ Key points:
                 )
 
             # Get relationships and connected nodes
-            relationships = await self._get_node_relationships(
+            relationships = await self.get_node_relationships(
                 node_id,
                 relationship_types
             )
@@ -435,7 +308,7 @@ Key points:
                     context.related.append(summary_line)
 
             # Get node content
-            node_content = self._extract_node_content(node)
+            node_content = self.extract_node_content(node)
             node_type = node.get("type", "Unknown")
 
             # Build comprehensive prompt
@@ -514,7 +387,7 @@ Synthesis:"""
         """
         try:
             # Get the node
-            node = await self._get_node_by_id(node_id)
+            node = await self.get_node_by_id(node_id)
             if not node:
                 return RecalculateConfidenceResponse(
                     success=False,
@@ -528,12 +401,12 @@ Synthesis:"""
 
             old_confidence = node.get("confidence", 1.0)
             node_type = node.get("type", "Unknown")
-            content = self._extract_node_content(node)
+            content = self.extract_node_content(node)
 
             # Get relationships if requested
             context_str = ""
             if factor_in_relationships:
-                relationships = await self._get_node_relationships(node_id, None)
+                relationships = await self.get_node_relationships(node_id, None)
                 supports = [r for r in relationships if r["type"] == "SUPPORTS"]
                 contradicts = [r for r in relationships if r["type"] == "CONTRADICTS"]
 
@@ -598,7 +471,7 @@ FACTORS:
                         ))
 
             # Update node confidence in database
-            await self._update_node_confidence(node_id, new_confidence)
+            await self.update_node_confidence(node_id, new_confidence)
 
             return RecalculateConfidenceResponse(
                 success=True,
@@ -620,272 +493,3 @@ FACTORS:
                 factors=[],
                 error=str(e)
             )
-
-    # ========================================================================
-    # Relationship Analysis Operations
-    # ========================================================================
-
-    async def summarize_relationship(
-        self,
-        edge_id: str,
-        include_evidence: bool = True,
-    ) -> SummarizeRelationshipResponse:
-        """Explain the connection between two nodes in plain language.
-
-        Args:
-            edge_id: The relationship ID to summarize
-            include_evidence: Whether to include supporting evidence
-
-        Returns:
-            SummarizeRelationshipResponse with explanation
-        """
-        try:
-            # Get the relationship and connected nodes
-            relationship = await self._get_relationship_by_id(edge_id)
-            if not relationship:
-                return SummarizeRelationshipResponse(
-                    success=False,
-                    edge_id=edge_id,
-                    from_node=NodeInfo(id="", type="", content=""),
-                    to_node=NodeInfo(id="", type="", content=""),
-                    relationship_type="",
-                    summary="",
-                    evidence=[],
-                    strength_assessment="weak",
-                    error="Relationship not found"
-                )
-
-            from_node_id = relationship["from_id"]
-            to_node_id = relationship["to_id"]
-            rel_type = relationship["type"]
-            rel_confidence = relationship.get("confidence", 1.0)
-            rel_notes = relationship.get("notes", "")
-
-            # Get both nodes
-            from_node = await self._get_node_by_id(from_node_id)
-            to_node = await self._get_node_by_id(to_node_id)
-
-            if not from_node or not to_node:
-                return SummarizeRelationshipResponse(
-                    success=False,
-                    edge_id=edge_id,
-                    from_node=NodeInfo(id="", type="", content=""),
-                    to_node=NodeInfo(id="", type="", content=""),
-                    relationship_type=rel_type,
-                    summary="",
-                    evidence=[],
-                    strength_assessment="weak",
-                    error="Connected nodes not found"
-                )
-
-            from_content = self._extract_node_content(from_node)
-            to_content = self._extract_node_content(to_node)
-            from_type = from_node.get("type", "Unknown")
-            to_type = to_node.get("type", "Unknown")
-
-            # Build prompt
-            evidence_str = f"\nRelationship notes: {rel_notes}" if rel_notes else ""
-
-            prompt = f"""Explain the relationship between these two knowledge graph nodes in plain language.
-
-From Node ({from_type}):
-{from_content[:500]}
-
-To Node ({to_type}):
-{to_content[:500]}
-
-Relationship Type: {rel_type}
-Confidence: {rel_confidence:.2f}
-{evidence_str}
-
-Provide:
-1. A clear explanation of how these nodes are connected (2-3 sentences)
-2. {"3-5 pieces of specific evidence supporting this relationship" if include_evidence else ""}
-
-Response:"""
-
-            response = await self.llm.ainvoke(prompt)
-            summary = response.content.strip()
-
-            # Extract evidence if included
-            evidence = []
-            if include_evidence:
-                # Parse evidence from response
-                lines = summary.split("\n")
-                in_evidence = False
-                for line in lines:
-                    line = line.strip()
-                    if "evidence" in line.lower():
-                        in_evidence = True
-                        continue
-                    if in_evidence and (line.startswith("-") or line.startswith("•") or line.startswith("1.")):
-                        evidence.append(line.lstrip("-•123456789. ").strip())
-
-            # Assess strength
-            if rel_confidence >= 0.8:
-                strength = "strong"
-            elif rel_confidence >= 0.6:
-                strength = "moderate"
-            else:
-                strength = "weak"
-
-            return SummarizeRelationshipResponse(
-                success=True,
-                edge_id=edge_id,
-                from_node=NodeInfo(
-                    id=from_node_id,
-                    type=from_type,
-                    content=from_content[:200]
-                ),
-                to_node=NodeInfo(
-                    id=to_node_id,
-                    type=to_type,
-                    content=to_content[:200]
-                ),
-                relationship_type=rel_type,
-                summary=summary,
-                evidence=evidence,
-                strength_assessment=strength
-            )
-
-        except Exception as e:
-            logger.exception(f"Error summarizing relationship {edge_id}")
-            return SummarizeRelationshipResponse(
-                success=False,
-                edge_id=edge_id,
-                from_node=NodeInfo(id="", type="", content=""),
-                to_node=NodeInfo(id="", type="", content=""),
-                relationship_type="",
-                summary="",
-                evidence=[],
-                strength_assessment="weak",
-                error=str(e)
-            )
-
-    # ========================================================================
-    # Helper Methods
-    # ========================================================================
-
-    async def _get_node_by_id(self, node_id: str) -> Optional[Dict[str, Any]]:
-        """Get a node by ID from Neo4j."""
-        query = """
-        MATCH (n {id: $node_id})
-        RETURN n, labels(n)[0] as type
-        """
-
-        async with neo4j_conn.get_session() as session:
-            result = await session.run(query, node_id=node_id)
-            record = await result.single()
-            if record:
-                node_data = dict(record["n"])
-                node_data["type"] = record["type"]
-                return node_data
-            return None
-
-    def _extract_node_content(self, node: Dict[str, Any]) -> str:
-        """Extract text content from a node."""
-        # Try common content fields in order
-        for field in ["text", "description", "content", "title", "name"]:
-            if field in node and node[field]:
-                return str(node[field])
-        return ""
-
-    async def _get_node_relationships(
-        self,
-        node_id: str,
-        relationship_types: Optional[List[str]] = None,
-    ) -> List[Dict[str, Any]]:
-        """Get all relationships for a node."""
-        type_filter = ""
-        if relationship_types:
-            type_filter = f"AND type(r) IN {relationship_types}"
-
-        query = f"""
-        MATCH (n {{id: $node_id}})-[r]-(connected)
-        {type_filter}
-        RETURN
-            r.id as id,
-            type(r) as type,
-            r.confidence as confidence,
-            connected.id as connected_id,
-            labels(connected)[0] as connected_type,
-            COALESCE(
-                connected.text,
-                connected.description,
-                connected.content,
-                connected.title,
-                connected.name,
-                ''
-            ) as connected_content
-        """
-
-        relationships = []
-        async with neo4j_conn.get_session() as session:
-            result = await session.run(query, node_id=node_id)
-            async for record in result:
-                relationships.append({
-                    "id": record["id"],
-                    "type": record["type"],
-                    "confidence": record["confidence"] or 1.0,
-                    "connected_id": record["connected_id"],
-                    "connected_type": record["connected_type"],
-                    "connected_content": record["connected_content"],
-                })
-
-        return relationships
-
-    async def _get_relationship_by_id(self, edge_id: str) -> Optional[Dict[str, Any]]:
-        """Get a relationship by ID."""
-        query = """
-        MATCH (from)-[r {id: $edge_id}]->(to)
-        RETURN
-            r.id as id,
-            type(r) as type,
-            r.confidence as confidence,
-            r.notes as notes,
-            from.id as from_id,
-            to.id as to_id
-        """
-
-        async with neo4j_conn.get_session() as session:
-            result = await session.run(query, edge_id=edge_id)
-            record = await result.single()
-            if record:
-                return {
-                    "id": record["id"],
-                    "type": record["type"],
-                    "confidence": record["confidence"],
-                    "notes": record["notes"],
-                    "from_id": record["from_id"],
-                    "to_id": record["to_id"],
-                }
-            return None
-
-    async def _update_node_confidence(self, node_id: str, new_confidence: float) -> bool:
-        """Update node confidence in database."""
-        query = """
-        MATCH (n {id: $node_id})
-        SET n.confidence = $confidence
-        RETURN n.id as id
-        """
-
-        async with neo4j_conn.get_session() as session:
-            result = await session.run(
-                query,
-                node_id=node_id,
-                confidence=new_confidence
-            )
-            record = await result.single()
-            return record is not None
-
-
-# Global service instance
-_tool_service: Optional[ToolService] = None
-
-
-def get_tool_service() -> ToolService:
-    """Get the global tool service instance."""
-    global _tool_service
-    if _tool_service is None:
-        _tool_service = ToolService()
-    return _tool_service

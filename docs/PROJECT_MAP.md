@@ -33,8 +33,22 @@ Quick reference for finding code in the ThoughtLab repository.
 - [app/services/graph_service.py](../backend/app/services/graph_service.py) - Neo4j operations (CRUD, relationships, queries)
 - [app/services/activity_service.py](../backend/app/services/activity_service.py) - Activity feed CRUD, suggestions workflow
 - [app/services/processing_service.py](../backend/app/services/processing_service.py) - Background processing orchestrator
-- [app/services/tool_service.py](../backend/app/services/tool_service.py) - LLM-powered operations implementation
+- [app/services/job_service.py](../backend/app/services/job_service.py) - Redis-based job queue for async operations
+- [app/services/report_service.py](../backend/app/services/report_service.py) - Report storage for LangGraph results
 - [app/services/embedding_service.py](../backend/app/services/embedding_service.py) - Legacy embedding interface (stub)
+
+### Tool Service (Modular LLM Operations)
+
+- [app/services/tools/service.py](../backend/app/services/tools/service.py) - ToolService facade class
+- [app/services/tools/base.py](../backend/app/services/tools/base.py) - Shared config, LLM init, Neo4j helpers
+- [app/services/tools/operations/node_analysis.py](../backend/app/services/tools/operations/node_analysis.py) - find_related, summarize, confidence
+- [app/services/tools/operations/node_modification.py](../backend/app/services/tools/operations/node_modification.py) - reclassify, merge, web_evidence
+- [app/services/tools/operations/relationship_analysis.py](../backend/app/services/tools/operations/relationship_analysis.py) - edge summarize, confidence, reclassify
+
+### Shared Tool Definitions
+
+- [app/tools/tool_definitions.py](../backend/app/tools/tool_definitions.py) - Tool metadata, execution modes, parameters
+- [app/tools/tool_registry.py](../backend/app/tools/tool_registry.py) - Registry for MCP + LangGraph consumption
 
 ### AI Module (LangChain/LangGraph)
 
@@ -47,20 +61,23 @@ Quick reference for finding code in the ThoughtLab repository.
 ### Agent Layer (LangGraph)
 
 - [app/agents/agent.py](../backend/app/agents/agent.py) - ReAct agent with intelligent tool selection
-- [app/agents/tools.py](../backend/app/agents/tools.py) - LangGraph tools (HTTP clients to backend API)
+- [app/agents/agent_tools.py](../backend/app/agents/agent_tools.py) - LangGraph tools (call ToolService directly)
 - [app/agents/config.py](../backend/app/agents/config.py) - Agent configuration
 - [app/agents/state.py](../backend/app/agents/state.py) - Agent state management
 
-### MCP Server
+### MCP Server (Mounted at /mcp)
 
-- [app/mcp/server.py](../backend/app/mcp/server.py) - FastMCP server with 6 tools
-- [mcp_server.py](../backend/mcp_server.py) - MCP server entry point
+- [app/mcp/server.py](../backend/app/mcp/server.py) - FastMCP server creation
+- [app/mcp/mcp_tools.py](../backend/app/mcp/mcp_tools.py) - MCP tool wrappers (call ToolService directly)
+- [mcp_server.py](../backend/mcp_server.py) - Standalone MCP server entry point
 
 ### Models (Request/Response DTOs)
 
 - [app/models/nodes.py](../backend/app/models/nodes.py) - Node types (Observation, Hypothesis, Source, etc.)
 - [app/models/activity.py](../backend/app/models/activity.py) - Activity types, suggestions, processing data
 - [app/models/settings.py](../backend/app/models/settings.py) - App settings models
+- [app/models/tool_models.py](../backend/app/models/tool_models.py) - AI tool request/response models
+- [app/models/job_models.py](../backend/app/models/job_models.py) - Job queue and report models
 
 ### Database Connectors
 
@@ -87,6 +104,8 @@ Quick reference for finding code in the ThoughtLab repository.
 - [tests/test_models.py](../backend/tests/test_models.py) - Model validation tests
 - [tests/test_api_activities.py](../backend/tests/test_api_activities.py) - Activity feed tests
 - [tests/test_activity_service.py](../backend/tests/test_activity_service.py) - Activity service tests
+- [tests/test_api_tools.py](../backend/tests/test_api_tools.py) - AI tool API endpoint tests
+- [tests/test_tool_service.py](../backend/tests/test_tool_service.py) - Tool service unit tests
 
 ---
 
@@ -139,8 +158,13 @@ Quick reference for finding code in the ThoughtLab repository.
 - `POST /api/v1/tools/nodes/{id}/find-related` - Find semantically similar nodes
 - `POST /api/v1/tools/nodes/{id}/summarize` - AI-powered summary
 - `POST /api/v1/tools/nodes/{id}/summarize-with-context` - Summary with relationships
-- `POST /api/v1/tools/nodes/{id}/recalculate-confidence` - Re-assess confidence
+- `POST /api/v1/tools/nodes/{id}/recalculate-confidence` - Re-assess node confidence
+- `POST /api/v1/tools/nodes/{id}/reclassify` - Change node type
+- `POST /api/v1/tools/nodes/{id}/search-web-evidence` - Web search (placeholder)
+- `POST /api/v1/tools/nodes/merge` - Merge two nodes
 - `POST /api/v1/tools/relationships/{id}/summarize` - Explain relationship
+- `POST /api/v1/tools/relationships/{id}/recalculate-confidence` - Re-assess edge confidence
+- `POST /api/v1/tools/relationships/{id}/reclassify` - Change relationship type
 
 ---
 
@@ -154,12 +178,14 @@ Quick reference for finding code in the ThoughtLab repository.
 ### Components
 
 - [components/GraphVisualizer.tsx](../frontend/src/components/GraphVisualizer.tsx) - Cytoscape graph visualization
-- [components/NodeInspector.tsx](../frontend/src/components/NodeInspector.tsx) - Node details and editing
-- [components/RelationInspector.tsx](../frontend/src/components/RelationInspector.tsx) - Relationship details
+- [components/NodeInspector.tsx](../frontend/src/components/NodeInspector.tsx) - Node details, editing, and AI tools
+- [components/RelationInspector.tsx](../frontend/src/components/RelationInspector.tsx) - Relationship details and AI tools
 - [components/CreateNodeModal.tsx](../frontend/src/components/CreateNodeModal.tsx) - Create nodes modal
 - [components/CreateRelationModal.tsx](../frontend/src/components/CreateRelationModal.tsx) - Create relationships modal
 - [components/SettingsModal.tsx](../frontend/src/components/SettingsModal.tsx) - App settings
 - [components/ActivityFeed.tsx](../frontend/src/components/ActivityFeed.tsx) - Activity feed with polling
+- [components/Toast.tsx](../frontend/src/components/Toast.tsx) - Toast notification system
+- [components/AIToolsSection.tsx](../frontend/src/components/AIToolsSection.tsx) - Collapsible AI tools section
 
 ### API Client & Types
 
@@ -167,6 +193,7 @@ Quick reference for finding code in the ThoughtLab repository.
 - [types/graph.ts](../frontend/src/types/graph.ts) - Node, edge, graph types
 - [types/settings.ts](../frontend/src/types/settings.ts) - Settings types
 - [types/activity.ts](../frontend/src/types/activity.ts) - Activity types
+- [types/tools.ts](../frontend/src/types/tools.ts) - AI tool request/response types
 
 ### Configuration
 
@@ -254,21 +281,27 @@ Quick reference for finding code in the ThoughtLab repository.
 - **Classifier**: `backend/app/ai/classifier.py` (LLM relationship classification)
 - **Workflow**: `backend/app/ai/workflow.py` (orchestration)
 
-### LLM Tools
+### LLM Tools (3-Layer Architecture)
 - **API**: `backend/app/api/routes/tools.py`
-- **Service**: `backend/app/services/tool_service.py`
-- **Processing**: `backend/app/services/processing_service.py`
+- **Core Service**: `backend/app/services/tools/` (modular operations)
+- **Tool Definitions**: `backend/app/tools/tool_definitions.py`
+- **Tool Registry**: `backend/app/tools/tool_registry.py`
+- **Models**: `backend/app/models/tool_models.py`
+- **Job Queue**: `backend/app/services/job_service.py`
+- **Reports**: `backend/app/services/report_service.py`
 
 ### LangGraph Agents
 - **Agent**: `backend/app/agents/agent.py`
-- **Tools**: `backend/app/agents/tools.py`
+- **Tools**: `backend/app/agents/agent_tools.py` (call ToolService directly)
 - **Config**: `backend/app/agents/config.py`
 - **Demo**: `backend/examples/agent_demo.py`
 
-### MCP Server
+### MCP Server (Mounted at /mcp)
 - **Server**: `backend/app/mcp/server.py`
+- **Tools**: `backend/app/mcp/mcp_tools.py` (call ToolService directly)
 - **Entry**: `backend/mcp_server.py`
 - **Config**: `claude_desktop_config.example.json`
+- **Admin Mode**: Set `THOUGHTLAB_MCP_ADMIN_MODE=true` for dangerous tools
 
 ### Settings
 - **Models**: `backend/app/models/settings.py`
@@ -327,17 +360,36 @@ Agent (app/agents/agent.py) - ReAct reasoning
                 ↓
 Selects find_related_nodes tool
                 ↓
-Tool calls: POST /api/v1/tools/nodes/obs-123/find-related
+Tool (agent_tools.py) calls ToolService directly (in-process)
                 ↓
-tool_service.find_related_nodes()
+ToolService.find_related_nodes()
+                ↓
+- Get node from graph_service
+- Find similar via similarity search
+- Format results
+- Save report to ReportService
+                ↓
+Return to agent
+                ↓
+Agent synthesizes response to user
+```
+
+### MCP Server Query
+
+```
+Claude Desktop: "Find related nodes for obs-123"
+                ↓
+Streamable HTTP to /mcp
+                ↓
+MCP tool (mcp_tools.py) calls ToolService directly
+                ↓
+ToolService.find_related_nodes()
                 ↓
 - Get node from graph_service
 - Find similar via similarity search
 - Format results
                 ↓
-Return to agent
-                ↓
-Agent synthesizes response to user
+Return formatted text to Claude Desktop
 ```
 
 ---
@@ -376,4 +428,4 @@ docker-compose logs neo4j       # View logs
 
 ---
 
-**Last Updated**: 2026-01-02
+**Last Updated**: 2026-01-03

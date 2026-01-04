@@ -40,6 +40,47 @@ from app.models.settings import (
     AppSettings,
     AppSettingsUpdate,
 )
+from app.models.job_models import (
+    JobStatus,
+    Job,
+    JobCreate,
+    JobResponse,
+    JobListResponse,
+    Report,
+    ReportCreate,
+    ReportResponse,
+    ReportListResponse,
+)
+from app.models.tool_models import (
+    # Shared/Helper models
+    RelatedNodeResult,
+    NodeInfo,
+    NodeContextSummary,
+    ConfidenceFactor,
+    SearchWebEvidenceResult,
+    # Request models
+    FindRelatedNodesRequest,
+    SummarizeNodeRequest,
+    SummarizeNodeWithContextRequest,
+    RecalculateConfidenceRequest,
+    SummarizeRelationshipRequest,
+    ReclassifyNodeRequest,
+    SearchWebEvidenceRequest,
+    RecalculateEdgeConfidenceRequest,
+    ReclassifyRelationshipRequest,
+    MergeNodesRequest,
+    # Response models
+    FindRelatedNodesResponse,
+    SummarizeNodeResponse,
+    SummarizeNodeWithContextResponse,
+    RecalculateConfidenceResponse,
+    SummarizeRelationshipResponse,
+    ReclassifyNodeResponse,
+    SearchWebEvidenceResponse,
+    RecalculateEdgeConfidenceResponse,
+    ReclassifyRelationshipResponse,
+    MergeNodesResponse,
+)
 
 __all__ = [
     # Nodes
@@ -80,5 +121,43 @@ __all__ = [
     # Settings
     "AppSettings",
     "AppSettingsUpdate",
+    # Job Models
+    "JobStatus",
+    "Job",
+    "JobCreate",
+    "JobResponse",
+    "JobListResponse",
+    "Report",
+    "ReportCreate",
+    "ReportResponse",
+    "ReportListResponse",
+    # Tool Models - Shared/Helper
+    "RelatedNodeResult",
+    "NodeInfo",
+    "NodeContextSummary",
+    "ConfidenceFactor",
+    "SearchWebEvidenceResult",
+    # Tool Models - Requests
+    "FindRelatedNodesRequest",
+    "SummarizeNodeRequest",
+    "SummarizeNodeWithContextRequest",
+    "RecalculateConfidenceRequest",
+    "SummarizeRelationshipRequest",
+    "ReclassifyNodeRequest",
+    "SearchWebEvidenceRequest",
+    "RecalculateEdgeConfidenceRequest",
+    "ReclassifyRelationshipRequest",
+    "MergeNodesRequest",
+    # Tool Models - Responses
+    "FindRelatedNodesResponse",
+    "SummarizeNodeResponse",
+    "SummarizeNodeWithContextResponse",
+    "RecalculateConfidenceResponse",
+    "SummarizeRelationshipResponse",
+    "ReclassifyNodeResponse",
+    "SearchWebEvidenceResponse",
+    "RecalculateEdgeConfidenceResponse",
+    "ReclassifyRelationshipResponse",
+    "MergeNodesResponse",
 ]
 

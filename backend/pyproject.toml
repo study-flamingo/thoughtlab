@@ -3,18 +3,18 @@ name = "backend"
 version = "0.2.0-alpha"
 requires-python = ">=3.13"
 dependencies = [
+    "neo4j>=5.26.0",
+    "redis>=7.1.0",
+    "fastmcp>=2.14.1",
+    "langchain>=1.2.0",
+    "langchain-openai>=1.1.0",
+    "langchain-neo4j>=0.6.0",
+    "langgraph>=1.0.5",
+    "uvicorn[standard]>=0.32.0",
     "fastapi>=0.121.0",
     "httpx>=0.26.0",
-    "neo4j>=5.26.0",
     "pydantic-settings>=2.6.0",
     "pytest>=8.0.0",
     "pytest-asyncio>=0.23.0",
     "python-dotenv>=1.0.0",
-    "redis>=5.0.0",
-    "uvicorn[standard]>=0.32.0",
-    "langchain>=1.2.0",
-    "langchain-openai>=1.1.0",
-    "langchain-neo4j>=0.6.0",
-    "langgraph>=1.0.0",
-    "fastmcp>=0.2.0",
 ]

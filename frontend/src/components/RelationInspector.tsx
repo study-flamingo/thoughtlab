@@ -1,7 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { graphApi } from '../services/api';
 import type { RelationshipType } from '../types/graph';
+import { useToast } from './Toast';
+import { AIToolsSection, AIToolButton } from './AIToolsSection';
 
 interface Props {
   relationshipId: string | null;
@@ -18,8 +20,13 @@ const RELATIONSHIP_TYPES: RelationshipType[] = [
 
 export default function RelationInspector({ relationshipId, onClose }: Props) {
   const queryClient = useQueryClient();
+  const { showToast } = useToast();
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState<any>({});
+  const [showReclassifyDropdown, setShowReclassifyDropdown] = useState(false);
+
+  // Ref for reclassify dropdown to handle click-outside
+  const reclassifyDropdownRef = useRef<HTMLDivElement>(null);
 
   const { data: relationship, isLoading } = useQuery({
     queryKey: ['relationship', relationshipId],
@@ -57,6 +64,26 @@ export default function RelationInspector({ relationshipId, onClose }: Props) {
     }
   }, [relationship]);
 
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        reclassifyDropdownRef.current &&
+        !reclassifyDropdownRef.current.contains(event.target as Node)
+      ) {
+        setShowReclassifyDropdown(false);
+      }
+    };
+
+    if (showReclassifyDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showReclassifyDropdown]);
+
   const updateRelationshipMutation = useMutation({
     mutationFn: (data: {
       confidence?: number;
@@ -80,6 +107,56 @@ export default function RelationInspector({ relationshipId, onClose }: Props) {
       onClose();
     },
   });
+
+  // AI Tool Mutations
+  const summarizeRelMutation = useMutation({
+    mutationFn: () => graphApi.summarizeRelationship(relationshipId!, {}),
+    onSuccess: () => {
+      showToast('Relationship summary ready', 'success');
+      queryClient.invalidateQueries({ queryKey: ['activities'] });
+    },
+    onError: (error: any) => {
+      const message = error.response?.data?.detail || error.message || 'Failed to summarize relationship';
+      showToast(message, 'error');
+    },
+  });
+
+  const recalcEdgeConfidenceMutation = useMutation({
+    mutationFn: () => graphApi.recalculateEdgeConfidence(relationshipId!, { consider_graph_structure: true }),
+    onSuccess: (response) => {
+      const oldConf = Math.round((response.data.old_confidence || 0) * 100);
+      const newConf = Math.round((response.data.new_confidence || 0) * 100);
+      showToast(`Confidence: ${oldConf}% → ${newConf}%`, 'success');
+      queryClient.invalidateQueries({ queryKey: ['relationship', relationshipId] });
+      queryClient.invalidateQueries({ queryKey: ['graph'] });
+      queryClient.invalidateQueries({ queryKey: ['activities'] });
+    },
+    onError: (error: any) => {
+      const message = error.response?.data?.detail || error.message || 'Failed to recalculate confidence';
+      showToast(message, 'error');
+    },
+  });
+
+  const reclassifyRelMutation = useMutation({
+    mutationFn: (newType: string | null) => graphApi.reclassifyRelationship(relationshipId!, { new_type: newType, preserve_notes: true }),
+    onSuccess: (response) => {
+      const aiSuggested = response.data.suggested_by_ai ? ' (AI suggested)' : '';
+      showToast(`Reclassified to ${response.data.new_type}${aiSuggested}`, 'success');
+      setShowReclassifyDropdown(false);
+      queryClient.invalidateQueries({ queryKey: ['relationship', relationshipId] });
+      queryClient.invalidateQueries({ queryKey: ['graph'] });
+      queryClient.invalidateQueries({ queryKey: ['activities'] });
+    },
+    onError: (error: any) => {
+      const message = error.response?.data?.detail || error.message || 'Failed to reclassify relationship';
+      showToast(message, 'error');
+    },
+  });
+
+  const isAnyToolRunning =
+    summarizeRelMutation.isPending ||
+    recalcEdgeConfidenceMutation.isPending ||
+    reclassifyRelMutation.isPending;
 
   const handleSave = () => {
     if (!relationship) return;
@@ -329,6 +406,63 @@ export default function RelationInspector({ relationshipId, onClose }: Props) {
             )}
           </div>
         </div>
+
+        {/* AI Tools Section - only show when not editing */}
+        {!isEditing && (
+          <AIToolsSection>
+            <AIToolButton
+              label="Summarize Relationship"
+              icon="📝"
+              onClick={() => summarizeRelMutation.mutate()}
+              isLoading={summarizeRelMutation.isPending}
+              disabled={isAnyToolRunning}
+            />
+            <AIToolButton
+              label="Recalculate Confidence"
+              icon="🎯"
+              onClick={() => recalcEdgeConfidenceMutation.mutate()}
+              isLoading={recalcEdgeConfidenceMutation.isPending}
+              disabled={isAnyToolRunning}
+            />
+
+            {/* Reclassify Relationship - with dropdown */}
+            <div className="relative" ref={reclassifyDropdownRef}>
+              <AIToolButton
+                label="Reclassify Relationship"
+                icon="🏷️"
+                onClick={() => setShowReclassifyDropdown(!showReclassifyDropdown)}
+                isLoading={reclassifyRelMutation.isPending}
+                disabled={isAnyToolRunning}
+              />
+              {showReclassifyDropdown && (
+                <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-700 border dark:border-gray-600 rounded-md shadow-lg z-10">
+                  <button
+                    onClick={() => {
+                      reclassifyRelMutation.mutate(null);
+                      setShowReclassifyDropdown(false);
+                    }}
+                    className="block w-full px-3 py-2 text-left text-sm text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/30 font-medium rounded-t-md"
+                  >
+                    Let AI Suggest
+                  </button>
+                  <div className="border-t dark:border-gray-600" />
+                  {RELATIONSHIP_TYPES.filter(t => t !== relationship?.type).map((type, idx, arr) => (
+                    <button
+                      key={type}
+                      onClick={() => {
+                        reclassifyRelMutation.mutate(type);
+                        setShowReclassifyDropdown(false);
+                      }}
+                      className={`block w-full px-3 py-2 text-left text-sm text-gray-700 dark:text-gray-200 hover:bg-purple-50 dark:hover:bg-purple-900/30 ${idx === arr.length - 1 ? 'rounded-b-md' : ''}`}
+                    >
+                      {type}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </AIToolsSection>
+        )}
 
         {/* Metadata */}
         {relationship.created_at && (

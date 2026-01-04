@@ -162,10 +162,15 @@ thoughtlab/
 ├── backend/              # Python FastAPI backend
 │   ├── app/
 │   │   ├── api/routes/   # API endpoints
+│   │   ├── agents/       # LangGraph agents
+│   │   ├── ai/           # AI workflow (embeddings, similarity)
 │   │   ├── core/         # Configuration
 │   │   ├── db/           # Database connections
+│   │   ├── mcp/          # MCP server (mounted at /mcp)
 │   │   ├── models/       # Pydantic models
-│   │   └── services/     # Business logic
+│   │   ├── services/     # Business logic
+│   │   │   └── tools/    # Modular tool service
+│   │   └── tools/        # Shared tool definitions
 │   └── tests/            # Backend tests
 ├── frontend/             # React TypeScript frontend
 │   ├── src/
@@ -212,9 +217,13 @@ DATABASE_URL=sqlite:///./research_graph.db
 REDIS_URL=redis://localhost:6379
 SECRET_KEY=your-secret-key-here
 
-# Optional LLM keys
-OPENAI_API_KEY=
-ANTHROPIC_API_KEY=
+# AI Configuration (required for AI tools)
+THOUGHTLAB_OPENAI_API_KEY=sk-...
+THOUGHTLAB_LLM_MODEL=gpt-4o-mini
+THOUGHTLAB_EMBEDDING_MODEL=text-embedding-3-small
+
+# MCP Server (optional)
+THOUGHTLAB_MCP_ADMIN_MODE=false  # Enable dangerous tools in MCP
 ```
 
 ### Frontend (`frontend/.env`)
@@ -300,17 +309,17 @@ docker-compose ps  # Should show "healthy"
 - Automatic connection suggestions based on semantic similarity
 - Comprehensive test suite
 - Security scanning (Gitleaks)
+- **LLM-powered graph operations** (10 AI tools: find related, summarize, reclassify, merge nodes, etc.)
+- **MCP server** at `/mcp` endpoint for Claude Desktop integration
+- **LangGraph agents** with intelligent tool selection
+- **Unified tool architecture** - shared definitions for REST API, LangGraph, and MCP
 
 ### 🚧 Coming Soon
 
-- LLM-powered graph operations (find related, summarize, web search, merge nodes)
-- Natural language tool interface for graph manipulation
-- User confirmation system for destructive operations
 - Real-time WebSocket updates
 - Advanced search and filtering
 - User authentication
 - Graph export/import
-- MCP server for Claude Desktop integration
 - Chrome extension for web capture
 
 ## License

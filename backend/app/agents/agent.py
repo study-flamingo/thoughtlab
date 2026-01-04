@@ -11,7 +11,7 @@ from langgraph.graph import StateGraph
 import logging
 
 from app.agents.config import AgentConfig
-from app.agents.tools import get_thoughtlab_tools
+from app.agents.agent_tools import get_agent_tools
 from app.agents.state import AgentState
 
 logger = logging.getLogger(__name__)
@@ -114,14 +114,8 @@ def create_thoughtlab_agent(
         api_key=config.openai_api_key,
     )
 
-    # Get tools
-    tools = get_thoughtlab_tools()
-
-    # Update API base URL in tools module if configured
-    if config.api_base_url != "http://localhost:8000/api/v1":
-        import app.agents.tools as tools_module
-        tools_module.API_BASE_URL = config.api_base_url
-        logger.info(f"Using API base URL: {config.api_base_url}")
+    # Get tools (now call ToolService directly, no HTTP)
+    tools = get_agent_tools()
 
     # Create ReAct agent with tools and system prompt
     # The ReAct pattern allows the agent to reason about which tools to use

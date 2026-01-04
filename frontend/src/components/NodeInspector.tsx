@@ -1,7 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { graphApi } from '../services/api';
 import type { GraphNode, LinkItem } from '../types/graph';
+import { useToast } from './Toast';
+import { AIToolsSection, AIToolButton } from './AIToolsSection';
 
 interface Props {
   nodeId: string | null;
@@ -10,8 +12,37 @@ interface Props {
 
 export default function NodeInspector({ nodeId, onClose }: Props) {
   const queryClient = useQueryClient();
+  const { showToast } = useToast();
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState<any>({});
+  const [showReclassifyDropdown, setShowReclassifyDropdown] = useState(false);
+  const [reclassifyType, setReclassifyType] = useState<string>('');
+  const [showMergeModal, setShowMergeModal] = useState(false);
+  const [mergeTargetId, setMergeTargetId] = useState<string>('');
+  const [mergeStrategy, setMergeStrategy] = useState<'combine' | 'prefer_primary' | 'prefer_secondary'>('combine');
+
+  // Ref for reclassify dropdown to handle click-outside
+  const reclassifyDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        reclassifyDropdownRef.current &&
+        !reclassifyDropdownRef.current.contains(event.target as Node)
+      ) {
+        setShowReclassifyDropdown(false);
+      }
+    };
+
+    if (showReclassifyDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showReclassifyDropdown]);
 
   const { data: node, isLoading } = useQuery({
     queryKey: ['node', nodeId],
@@ -103,6 +134,123 @@ export default function NodeInspector({ nodeId, onClose }: Props) {
       onClose();
     },
   });
+
+  // AI Tool Mutations
+  const findRelatedMutation = useMutation({
+    mutationFn: () => graphApi.findRelatedNodes(nodeId!, {}),
+    onSuccess: (response) => {
+      const count = response.data.related_nodes?.length || 0;
+      showToast(`Found ${count} related nodes`, 'success');
+      queryClient.invalidateQueries({ queryKey: ['activities'] });
+    },
+    onError: (error: any) => {
+      const message = error.response?.data?.detail || error.message || 'Failed to find related nodes';
+      showToast(message, 'error');
+    },
+  });
+
+  const summarizeMutation = useMutation({
+    mutationFn: () => graphApi.summarizeNode(nodeId!, { style: 'concise' }),
+    onSuccess: () => {
+      showToast('Summary generated', 'success');
+      queryClient.invalidateQueries({ queryKey: ['activities'] });
+    },
+    onError: (error: any) => {
+      const message = error.response?.data?.detail || error.message || 'Failed to summarize';
+      showToast(message, 'error');
+    },
+  });
+
+  const summarizeContextMutation = useMutation({
+    mutationFn: () => graphApi.summarizeNodeWithContext(nodeId!, {}),
+    onSuccess: () => {
+      showToast('Context summary ready', 'success');
+      queryClient.invalidateQueries({ queryKey: ['activities'] });
+    },
+    onError: (error: any) => {
+      const message = error.response?.data?.detail || error.message || 'Failed to summarize with context';
+      showToast(message, 'error');
+    },
+  });
+
+  const recalcConfidenceMutation = useMutation({
+    mutationFn: () => graphApi.recalculateNodeConfidence(nodeId!, { factor_in_relationships: true }),
+    onSuccess: (response) => {
+      const oldConf = Math.round((response.data.old_confidence || 0) * 100);
+      const newConf = Math.round((response.data.new_confidence || 0) * 100);
+      showToast(`Confidence: ${oldConf}% → ${newConf}%`, 'success');
+      queryClient.invalidateQueries({ queryKey: ['node', nodeId] });
+      queryClient.invalidateQueries({ queryKey: ['graph'] });
+      queryClient.invalidateQueries({ queryKey: ['activities'] });
+    },
+    onError: (error: any) => {
+      const message = error.response?.data?.detail || error.message || 'Failed to recalculate confidence';
+      showToast(message, 'error');
+    },
+  });
+
+  const reclassifyMutation = useMutation({
+    mutationFn: (newType: string) => graphApi.reclassifyNode(nodeId!, { new_type: newType, preserve_relationships: true }),
+    onSuccess: (response) => {
+      showToast(`Reclassified to ${response.data.new_type}`, 'success');
+      setShowReclassifyDropdown(false);
+      setReclassifyType('');
+      queryClient.invalidateQueries({ queryKey: ['node', nodeId] });
+      queryClient.invalidateQueries({ queryKey: ['graph'] });
+      queryClient.invalidateQueries({ queryKey: ['activities'] });
+    },
+    onError: (error: any) => {
+      const message = error.response?.data?.detail || error.message || 'Failed to reclassify node';
+      showToast(message, 'error');
+    },
+  });
+
+  const searchWebMutation = useMutation({
+    mutationFn: () => graphApi.searchWebEvidence(nodeId!, { evidence_type: 'supporting', max_results: 5 }),
+    onSuccess: (response) => {
+      if (response.data.success) {
+        const count = response.data.results?.length || 0;
+        showToast(`Found ${count} results`, 'success');
+      } else {
+        showToast(response.data.message || 'Web search not configured', 'warning');
+      }
+      queryClient.invalidateQueries({ queryKey: ['activities'] });
+    },
+    onError: (error: any) => {
+      const message = error.response?.data?.detail || error.message || 'Failed to search web';
+      showToast(message, 'error');
+    },
+  });
+
+  const mergeNodesMutation = useMutation({
+    mutationFn: () => graphApi.mergeNodes({
+      primary_node_id: nodeId!,
+      secondary_node_id: mergeTargetId,
+      merge_strategy: mergeStrategy,
+    }),
+    onSuccess: (response) => {
+      showToast(response.data.message || 'Nodes merged successfully', 'success');
+      setShowMergeModal(false);
+      setMergeTargetId('');
+      setMergeStrategy('combine');
+      queryClient.invalidateQueries({ queryKey: ['node', nodeId] });
+      queryClient.invalidateQueries({ queryKey: ['graph'] });
+      queryClient.invalidateQueries({ queryKey: ['activities'] });
+    },
+    onError: (error: any) => {
+      const message = error.response?.data?.detail || error.message || 'Failed to merge nodes';
+      showToast(message, 'error');
+    },
+  });
+
+  const isAnyToolRunning =
+    findRelatedMutation.isPending ||
+    summarizeMutation.isPending ||
+    summarizeContextMutation.isPending ||
+    recalcConfidenceMutation.isPending ||
+    reclassifyMutation.isPending ||
+    searchWebMutation.isPending ||
+    mergeNodesMutation.isPending;
 
   const handleSave = () => {
     if (!node) return;
@@ -606,6 +754,83 @@ export default function NodeInspector({ nodeId, onClose }: Props) {
           )}
         </div>
 
+        {/* AI Tools Section - only show when not editing */}
+        {!isEditing && (
+          <AIToolsSection>
+            <AIToolButton
+              label="Find Related Nodes"
+              icon="🔍"
+              onClick={() => findRelatedMutation.mutate()}
+              isLoading={findRelatedMutation.isPending}
+              disabled={isAnyToolRunning}
+            />
+            <AIToolButton
+              label="Summarize"
+              icon="📝"
+              onClick={() => summarizeMutation.mutate()}
+              isLoading={summarizeMutation.isPending}
+              disabled={isAnyToolRunning}
+            />
+            <AIToolButton
+              label="Summarize with Context"
+              icon="📊"
+              onClick={() => summarizeContextMutation.mutate()}
+              isLoading={summarizeContextMutation.isPending}
+              disabled={isAnyToolRunning}
+            />
+            <AIToolButton
+              label="Recalculate Confidence"
+              icon="🎯"
+              onClick={() => recalcConfidenceMutation.mutate()}
+              isLoading={recalcConfidenceMutation.isPending}
+              disabled={isAnyToolRunning}
+            />
+
+            {/* Reclassify Node - with dropdown */}
+            <div className="relative" ref={reclassifyDropdownRef}>
+              <AIToolButton
+                label="Reclassify Node"
+                icon="🏷️"
+                onClick={() => setShowReclassifyDropdown(!showReclassifyDropdown)}
+                isLoading={reclassifyMutation.isPending}
+                disabled={isAnyToolRunning}
+              />
+              {showReclassifyDropdown && (
+                <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-700 border dark:border-gray-600 rounded-md shadow-lg z-10">
+                  {['Observation', 'Hypothesis', 'Entity', 'Source', 'Concept'].filter(t => t !== node?.type).map((type) => (
+                    <button
+                      key={type}
+                      onClick={() => {
+                        reclassifyMutation.mutate(type);
+                        setShowReclassifyDropdown(false);
+                      }}
+                      className="block w-full px-3 py-2 text-left text-sm text-gray-700 dark:text-gray-200 hover:bg-purple-50 dark:hover:bg-purple-900/30 first:rounded-t-md last:rounded-b-md"
+                    >
+                      {type}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <AIToolButton
+              label="Search Web for Evidence"
+              icon="🌐"
+              onClick={() => searchWebMutation.mutate()}
+              isLoading={searchWebMutation.isPending}
+              disabled={isAnyToolRunning}
+            />
+            <AIToolButton
+              label="Merge with Another Node"
+              icon="🔗"
+              onClick={() => setShowMergeModal(true)}
+              isLoading={mergeNodesMutation.isPending}
+              disabled={isAnyToolRunning}
+              variant="danger"
+            />
+          </AIToolsSection>
+        )}
+
         {/* Metadata */}
         <div className="pt-4 border-t dark:border-gray-700 space-y-2">
           <div>
@@ -688,6 +913,96 @@ export default function NodeInspector({ nodeId, onClose }: Props) {
           </>
         )}
       </div>
+
+      {/* Merge Nodes Modal */}
+      {showMergeModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full mx-4">
+            <div className="p-4 border-b dark:border-gray-700">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                Merge Nodes
+              </h3>
+            </div>
+
+            <div className="p-4 space-y-4">
+              {/* Warning */}
+              <div className="bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-200 dark:border-yellow-800 rounded-md p-3">
+                <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                  <strong>Warning:</strong> This action cannot be undone. The secondary node will be deleted after merging.
+                </p>
+              </div>
+
+              {/* Primary Node Info */}
+              <div>
+                <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+                  Primary Node (this node)
+                </label>
+                <div className="text-sm text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-700 rounded-md p-2">
+                  <span className="inline-block px-2 py-0.5 text-xs font-medium rounded bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 mr-2">
+                    {node?.type}
+                  </span>
+                  <span className="font-mono text-xs">{nodeId?.substring(0, 12)}...</span>
+                </div>
+              </div>
+
+              {/* Target Node ID Input */}
+              <div>
+                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Secondary Node ID (to merge into primary)
+                </label>
+                <input
+                  type="text"
+                  value={mergeTargetId}
+                  onChange={(e) => setMergeTargetId(e.target.value)}
+                  className="w-full border dark:border-gray-600 rounded-md px-3 py-2 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Enter node ID to merge..."
+                />
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  Both nodes must be of the same type
+                </p>
+              </div>
+
+              {/* Merge Strategy */}
+              <div>
+                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Merge Strategy
+                </label>
+                <select
+                  value={mergeStrategy}
+                  onChange={(e) => setMergeStrategy(e.target.value as typeof mergeStrategy)}
+                  className="w-full border dark:border-gray-600 rounded-md px-3 py-2 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="combine">Combine - Merge content from both nodes</option>
+                  <option value="prefer_primary">Keep Primary - Use primary node's content</option>
+                  <option value="prefer_secondary">Keep Secondary - Use secondary node's content</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Modal Actions */}
+            <div className="p-4 border-t dark:border-gray-700 flex gap-2">
+              <button
+                onClick={() => {
+                  setShowMergeModal(false);
+                  setMergeTargetId('');
+                  setMergeStrategy('combine');
+                }}
+                className="flex-1 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                disabled={mergeNodesMutation.isPending}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => mergeNodesMutation.mutate()}
+                disabled={!mergeTargetId.trim() || mergeNodesMutation.isPending}
+                className="flex-1 px-4 py-2 text-sm bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {mergeNodesMutation.isPending ? 'Merging...' : 'Merge Nodes'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

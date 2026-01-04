@@ -45,8 +45,9 @@ kill_port() {
 
     if is_windows; then
         # Windows: use netstat to find PIDs on the port
-        # More robust parsing that handles different netstat output formats
-        pids=$(netstat -ano 2>/dev/null | awk "/TCP.*:$port .*LISTENING/ {print \$5}" | sort -u || true)
+        # Match both LISTENING and ESTABLISHED states, and handle various formats
+        # Pattern matches lines like: "  TCP    0.0.0.0:5173           0.0.0.0:0              LISTENING       12345"
+        pids=$(netstat -ano 2>/dev/null | grep -E ":$port\s" | grep -E "LISTENING|ESTABLISHED" | awk '{print $NF}' | sort -u || true)
 
         if [ -n "$pids" ]; then
             for pid in $pids; do
@@ -161,14 +162,28 @@ kill_vite_processes() {
     local found=0
 
     if is_windows; then
-        # Method 1: Kill by process name and command line filter
+        # Method 1: Kill by port (most reliable for Vite on 5173)
+        echo "  Checking port 5173..."
+        local port_pids=$(powershell.exe -Command "Get-NetTCPConnection -LocalPort 5173 -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess | Sort-Object -Unique" 2>/dev/null | tr -d '\r' || true)
+        if [ -n "$port_pids" ]; then
+            for pid in $port_pids; do
+                pid=$(echo "$pid" | tr -d ' \r\n')
+                if [[ "$pid" =~ ^[0-9]+$ ]] && [ "$pid" != "0" ]; then
+                    echo "  Killing process on port 5173 (PID: $pid)..."
+                    taskkill //F //PID "$pid" //T 2>&1 | grep -v "ERROR: The process" || true
+                    found=1
+                fi
+            done
+        fi
+
+        # Method 2: Kill by process name and command line filter
         echo "  Checking for node.exe processes running vite..."
         taskkill //F //FI "IMAGENAME eq node.exe" //FI "WINDOWTITLE eq *vite*" //T 2>&1 | grep -v "ERROR: The process" || true
 
-        # Method 2: Use PowerShell to find and kill node processes with vite in command line
+        # Method 3: Use PowerShell to find and kill node processes with vite in command line
         powershell.exe -Command "Get-Process node -ErrorAction SilentlyContinue | Where-Object { \$_.CommandLine -like '*vite*' } | Stop-Process -Force" 2>/dev/null || true
 
-        # Method 3: Kill all node.exe processes in the frontend directory
+        # Method 4: Kill all node.exe processes in the frontend directory
         local frontend_pids=$(powershell.exe -Command "Get-WmiObject Win32_Process | Where-Object { \$_.Name -eq 'node.exe' -and \$_.CommandLine -like '*thoughtlab*frontend*' } | Select-Object -ExpandProperty ProcessId" 2>/dev/null | tr -d '\r' || true)
         if [ -n "$frontend_pids" ]; then
             for pid in $frontend_pids; do

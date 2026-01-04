@@ -14,29 +14,39 @@ The ThoughtLab MCP server exposes knowledge graph operations as MCP tools, allow
 ┌─────────────────────────────────────────────┐
 │        Claude Desktop (MCP Client)          │
 │                                             │
-│  Uses MCP tools to interact with graph     │
+│  Uses MCP tools to interact with graph      │
 └───────────────────┬─────────────────────────┘
                     │
-                    ▼ stdio/HTTP (MCP Protocol)
+                    ▼ Streamable HTTP (MCP Protocol)
 ┌─────────────────────────────────────────────┐
-│      ThoughtLab MCP Server (FastMCP)        │
+│  ThoughtLab MCP Server (FastMCP at /mcp)    │
 │                                             │
-│  6 Tools:                                   │
+│  10+ Tools (registered from tool_definitions):
 │  • find_related_nodes                       │
 │  • summarize_node                           │
 │  • summarize_node_with_context              │
 │  • recalculate_node_confidence              │
+│  • reclassify_node                          │
+│  • search_web_evidence                      │
+│  • merge_nodes (dangerous, gated)           │
 │  • summarize_relationship                   │
+│  • recalculate_edge_confidence              │
+│  • reclassify_relationship                  │
 │  • check_api_health                         │
 └───────────────────┬─────────────────────────┘
                     │
-                    ▼ HTTP API Calls
+                    ▼ In-Process Calls (no HTTP)
 ┌─────────────────────────────────────────────┐
-│         ThoughtLab Backend API              │
+│            ToolService                      │
 │                                             │
-│  REST endpoints for all operations          │
+│  Shared service with LangGraph agents       │
+│  Calls Neo4j, OpenAI, and other services   │
 └─────────────────────────────────────────────┘
 ```
+
+**Key Architecture Change**: The MCP server now calls ToolService directly (in-process),
+sharing the same code path as LangGraph agents. This eliminates HTTP overhead and ensures
+consistent behavior across all interfaces.
 
 ---
 
@@ -69,15 +79,19 @@ This installs:
 The MCP server uses these environment variables:
 
 ```bash
-# Required: OpenAI API key for backend operations
+# Required: OpenAI API key for AI operations
 export THOUGHTLAB_OPENAI_API_KEY="sk-..."
 
-# Optional: Custom backend API URL
-export THOUGHTLAB_API_BASE_URL="http://localhost:8000/api/v1"
+# Optional: Enable dangerous tools (merge, delete, etc.)
+export THOUGHTLAB_MCP_ADMIN_MODE="false"  # Set to "true" to enable
 
-# Optional: API request timeout in seconds
-export THOUGHTLAB_API_TIMEOUT="30.0"
+# Optional: LLM configuration
+export THOUGHTLAB_LLM_MODEL="gpt-4o-mini"
+export THOUGHTLAB_EMBEDDING_MODEL="text-embedding-3-small"
 ```
+
+**Note on Admin Mode**: By default, dangerous tools like `merge_nodes` are disabled
+in MCP for safety. Set `THOUGHTLAB_MCP_ADMIN_MODE=true` to enable them.
 
 ### Verify Configuration
 
@@ -112,7 +126,7 @@ See [Claude Desktop Configuration](#claude-desktop-configuration) below.
 
 ## Available Tools
 
-The MCP server exposes 6 tools:
+The MCP server exposes 10+ tools (registered from shared tool definitions):
 
 ### 1. find_related_nodes
 
@@ -379,20 +393,19 @@ asyncio.run(test_mcp_server())
 
 ## Architecture Benefits
 
-### 1. Same Backend for All Interfaces
+### 1. Unified Tool Layer
 
-The MCP server uses the exact same backend API as:
-- LangGraph agents
-- Future Chrome extension
-- Future CLI tools
-- Direct API access
+All interfaces share the same ToolService:
+- MCP server (Claude Desktop)
+- LangGraph agents (programmatic)
+- REST API (frontend UI)
 
-### 2. Complete Separation
+### 2. In-Process Efficiency
 
-- MCP server is a pure HTTP client
-- No direct database access
-- No shared services
-- Can deploy independently
+- MCP calls ToolService directly (no HTTP overhead)
+- Same code path as LangGraph agents
+- Shared tool definitions from `app/tools/tool_definitions.py`
+- Consistent behavior across all interfaces
 
 ### 3. Standardized Protocol
 
@@ -400,6 +413,12 @@ The MCP server uses the exact same backend API as:
 - Not tied to Claude Desktop
 - Future-proof architecture
 - Industry standard protocol
+
+### 4. Safety Controls
+
+- Dangerous tools gated by `THOUGHTLAB_MCP_ADMIN_MODE`
+- Job queue for async operations
+- Report storage for LangGraph results
 
 ---
 
@@ -478,18 +497,20 @@ logging.basicConfig(
 
 - [ ] Streaming responses for long operations
 - [ ] Batch tool operations
-- [ ] Web search integration
-- [ ] Node merging with confirmation
 - [ ] Graph visualization generation
 - [ ] Export/report tools
+- [ ] Authentication/authorization
+- [ ] Rate limiting
+- [ ] Metrics and monitoring
+- [ ] Caching layer
 
-### Coming Soon
+### Recently Implemented
 
-- HTTP transport option (not just stdio)
-- Authentication/authorization
-- Rate limiting
-- Metrics and monitoring
-- Caching layer
+- Streamable HTTP transport (mounted at `/mcp`)
+- Web search integration (via `search_web_evidence` tool)
+- Node merging with confirmation (via `merge_nodes` tool, gated by admin mode)
+- 10+ tools registered from shared tool definitions
+- In-process ToolService calls (no HTTP overhead)
 
 ---
 

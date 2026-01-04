@@ -41,14 +41,27 @@ cd "$PROJECT_ROOT"
 
 echo ""
 echo "⏳ Waiting for ports to be released..."
-sleep 2
+sleep 3
 
 # Double-check that port 5173 is free
 echo "🔍 Verifying port 5173 is available..."
-if lsof -i :5173 > /dev/null 2>&1 || netstat -ano 2>/dev/null | grep -E "LISTENING.*:5173\b" > /dev/null 2>&1; then
-    echo "⚠️  Port 5173 still in use. Forcing cleanup..."
-    "$PROJECT_ROOT/stop.sh" > /dev/null 2>&1 || true
-    sleep 2
+MAX_RETRIES=3
+RETRY_COUNT=0
+
+while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+    if lsof -i :5173 > /dev/null 2>&1 || netstat -ano 2>/dev/null | grep -E ":5173\s" | grep -E "LISTENING|ESTABLISHED" > /dev/null 2>&1; then
+        echo "⚠️  Port 5173 still in use (attempt $((RETRY_COUNT+1))/$MAX_RETRIES). Forcing cleanup..."
+        "$PROJECT_ROOT/stop.sh" > /dev/null 2>&1 || true
+        sleep 2
+        RETRY_COUNT=$((RETRY_COUNT+1))
+    else
+        echo "✅ Port 5173 is now free"
+        break
+    fi
+done
+
+if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
+    echo "⚠️  Warning: Could not verify port 5173 is free after $MAX_RETRIES attempts"
 fi
 
 echo ""

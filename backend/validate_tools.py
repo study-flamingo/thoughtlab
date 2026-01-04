@@ -13,9 +13,11 @@ def validate_imports():
     print("[*] Validating imports...")
 
     try:
-        print("  - Importing tool_service...")
-        from app.services.tool_service import (
-            get_tool_service,
+        print("  - Importing tools service...")
+        from app.services.tools import get_tool_service, ToolService
+
+        print("  - Importing tool models...")
+        from app.models.tool_models import (
             FindRelatedNodesResponse,
             SummarizeNodeResponse,
             SummarizeNodeWithContextResponse,
@@ -43,7 +45,7 @@ def validate_service():
     print("\n[*] Validating service...")
 
     try:
-        from app.services.tool_service import get_tool_service
+        from app.services.tools import get_tool_service
 
         service = get_tool_service()
         print(f"  - Service initialized: {service.__class__.__name__}")

@@ -8,6 +8,28 @@ import type {
 } from '../types/graph';
 import type { AppSettings, AppSettingsUpdate } from '../types/settings';
 import type { Activity, ActivityFilter } from '../types/activity';
+import type {
+  FindRelatedNodesRequest,
+  FindRelatedNodesResponse,
+  SummarizeNodeRequest,
+  SummarizeNodeResponse,
+  SummarizeNodeWithContextRequest,
+  SummarizeNodeWithContextResponse,
+  RecalculateConfidenceRequest,
+  RecalculateConfidenceResponse,
+  ReclassifyNodeRequest,
+  ReclassifyNodeResponse,
+  SearchWebEvidenceRequest,
+  SearchWebEvidenceResponse,
+  SummarizeRelationshipRequest,
+  SummarizeRelationshipResponse,
+  RecalculateEdgeConfidenceRequest,
+  RecalculateEdgeConfidenceResponse,
+  ReclassifyRelationshipRequest,
+  ReclassifyRelationshipResponse,
+  MergeNodesRequest,
+  MergeNodesResponse,
+} from '../types/tools';
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1',
@@ -177,6 +199,40 @@ export const graphApi = {
       null,
       { params: feedback ? { feedback } : undefined }
     ),
+
+  // === AI Tools - Node Operations ===
+
+  findRelatedNodes: (nodeId: string, data: FindRelatedNodesRequest = {}) =>
+    api.post<FindRelatedNodesResponse>(`/tools/nodes/${nodeId}/find-related`, data),
+
+  summarizeNode: (nodeId: string, data: SummarizeNodeRequest = {}) =>
+    api.post<SummarizeNodeResponse>(`/tools/nodes/${nodeId}/summarize`, data),
+
+  summarizeNodeWithContext: (nodeId: string, data: SummarizeNodeWithContextRequest = {}) =>
+    api.post<SummarizeNodeWithContextResponse>(`/tools/nodes/${nodeId}/summarize-with-context`, data),
+
+  recalculateNodeConfidence: (nodeId: string, data: RecalculateConfidenceRequest = {}) =>
+    api.post<RecalculateConfidenceResponse>(`/tools/nodes/${nodeId}/recalculate-confidence`, data),
+
+  reclassifyNode: (nodeId: string, data: ReclassifyNodeRequest) =>
+    api.post<ReclassifyNodeResponse>(`/tools/nodes/${nodeId}/reclassify`, data),
+
+  searchWebEvidence: (nodeId: string, data: SearchWebEvidenceRequest = {}) =>
+    api.post<SearchWebEvidenceResponse>(`/tools/nodes/${nodeId}/search-web-evidence`, data),
+
+  mergeNodes: (data: MergeNodesRequest) =>
+    api.post<MergeNodesResponse>('/tools/nodes/merge', data),
+
+  // === AI Tools - Relationship Operations ===
+
+  summarizeRelationship: (edgeId: string, data: SummarizeRelationshipRequest = {}) =>
+    api.post<SummarizeRelationshipResponse>(`/tools/relationships/${edgeId}/summarize`, data),
+
+  recalculateEdgeConfidence: (edgeId: string, data: RecalculateEdgeConfidenceRequest = {}) =>
+    api.post<RecalculateEdgeConfidenceResponse>(`/tools/relationships/${edgeId}/recalculate-confidence`, data),
+
+  reclassifyRelationship: (edgeId: string, data: ReclassifyRelationshipRequest = {}) =>
+    api.post<ReclassifyRelationshipResponse>(`/tools/relationships/${edgeId}/reclassify`, data),
 };
 
 export default api;
