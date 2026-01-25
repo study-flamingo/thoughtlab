@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { graphApi } from '../services/api';
 import type { GraphNode, RelationshipType } from '../types/graph';
+import { RELATIONSHIP_TYPE_DISPLAY } from '../types/graph';
 
 interface Props {
   onClose: () => void;
@@ -13,6 +14,14 @@ const RELATIONSHIP_TYPES: RelationshipType[] = [
   'RELATES_TO',
   'OBSERVED_IN',
   'DISCUSSES',
+  'CITES',
+  'DERIVED_FROM',
+  'INSPIRED_BY',
+  'PRECEDES',
+  'CAUSES',
+  'PART_OF',
+  'SIMILAR_TO',
+  'HAS_CHUNK',
 ];
 
 export default function CreateRelationModal({ onClose }: Props) {
@@ -140,7 +149,7 @@ export default function CreateRelationModal({ onClose }: Props) {
               >
                 {RELATIONSHIP_TYPES.map((t) => (
                   <option key={t} value={t}>
-                    {t}
+                    {RELATIONSHIP_TYPE_DISPLAY[t]}
                   </option>
                 ))}
               </select>
@@ -193,7 +202,7 @@ export default function CreateRelationModal({ onClose }: Props) {
                   <option value="">Same as type / not specified</option>
                   {RELATIONSHIP_TYPES.map((t) => (
                     <option key={t} value={t}>
-                      {t}
+                      {RELATIONSHIP_TYPE_DISPLAY[t]}
                     </option>
                   ))}
                 </select>

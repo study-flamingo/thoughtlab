@@ -149,6 +149,9 @@ export const graphApi = {
   deleteNode: (nodeId: string) =>
     api.delete<{ id: string; message: string }>(`/nodes/${nodeId}`),
 
+  // Source types
+  getSourceTypes: () => api.get<string[]>('/graph/source-types'),
+
   // Settings
   getSettings: () => api.get<AppSettings>('/settings'),
   updateSettings: (data: AppSettingsUpdate) => api.put<AppSettings>('/settings', data),

@@ -1,11 +1,46 @@
 export type NodeType = 'Observation' | 'Hypothesis' | 'Source' | 'Concept' | 'Entity';
 
-export type RelationshipType = 
-  | 'SUPPORTS' 
-  | 'CONTRADICTS' 
-  | 'RELATES_TO' 
-  | 'OBSERVED_IN' 
-  | 'DISCUSSES';
+export type RelationshipType =
+  | 'SUPPORTS'
+  | 'CONTRADICTS'
+  | 'RELATES_TO'
+  | 'OBSERVED_IN'
+  | 'DISCUSSES'
+  | 'CITES'
+  | 'DERIVED_FROM'
+  | 'INSPIRED_BY'
+  | 'PRECEDES'
+  | 'CAUSES'
+  | 'PART_OF'
+  | 'SIMILAR_TO'
+  | 'HAS_CHUNK';
+
+// Human-readable display names for relationship types
+export const RELATIONSHIP_TYPE_DISPLAY: Record<RelationshipType, string> = {
+  'SUPPORTS': 'Supports Evidence',
+  'CONTRADICTS': 'Contradicts',
+  'RELATES_TO': 'Relates To',
+  'OBSERVED_IN': 'Observed In',
+  'DISCUSSES': 'Discusses',
+  'CITES': 'Cites Reference',
+  'DERIVED_FROM': 'Derived From',
+  'INSPIRED_BY': 'Inspired By',
+  'PRECEDES': 'Precedes',
+  'CAUSES': 'Causes',
+  'PART_OF': 'Part Of',
+  'SIMILAR_TO': 'Similar To',
+  'HAS_CHUNK': 'Has Chunk',
+};
+
+// Status colors for hypothesis nodes
+export type HypothesisStatus = 'proposed' | 'tested' | 'confirmed' | 'rejected';
+
+export const STATUS_COLORS: Record<HypothesisStatus, string> = {
+  'proposed': '#3B82F6',  // blue-500
+  'tested': '#F59E0B',    // amber-500
+  'confirmed': '#10B981', // emerald-500
+  'rejected': '#EF4444',  // red-500
+};
 
 export interface LinkItem {
   url: string;

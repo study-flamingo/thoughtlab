@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { graphApi } from '../services/api';
+import { useSourceTypes } from '../hooks/useSourceTypes';
 
 interface Props {
   onClose: () => void;
@@ -28,6 +29,7 @@ export default function CreateNodeModal({ onClose }: Props) {
   const [domain, setDomain] = useState('general');
 
   const queryClient = useQueryClient();
+  const { data: sourceTypes = [] } = useSourceTypes();
 
   const createObservationMutation = useMutation({
     mutationFn: graphApi.createObservation,
@@ -211,17 +213,9 @@ export default function CreateNodeModal({ onClose }: Props) {
                   placeholder="e.g., paper, article, video..."
                 />
                 <datalist id="create-source-type-suggestions">
-                  <option value="paper" />
-                  <option value="article" />
-                  <option value="book" />
-                  <option value="website" />
-                  <option value="forum" />
-                  <option value="video" />
-                  <option value="podcast" />
-                  <option value="social media" />
-                  <option value="documentation" />
-                  <option value="report" />
-                  <option value="other" />
+                  {sourceTypes.map((type) => (
+                    <option key={type} value={type} />
+                  ))}
                 </datalist>
               </div>
             </>

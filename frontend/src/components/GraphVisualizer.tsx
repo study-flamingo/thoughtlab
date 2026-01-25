@@ -4,6 +4,7 @@ import CytoscapeComponent from 'react-cytoscapejs';
 import { type Core } from 'cytoscape';
 import { graphApi } from '../services/api';
 import type { GraphNode, GraphEdge, NodeType } from '../types/graph';
+import { STATUS_COLORS } from '../types/graph';
 import type { AppSettings, RelationStyle } from '../types/settings';
 
 const NODE_TYPES: NodeType[] = ['Observation', 'Hypothesis', 'Source', 'Concept', 'Entity'];
@@ -107,8 +108,10 @@ export default function GraphVisualizer({
 }: Props) {
   const cyRef = useRef<Core | null>(null);
   const gridCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const statusBubblesRef = useRef<HTMLDivElement | null>(null);
   const [isReady, setIsReady] = useState<boolean>(false);
   const setupDoneRef = useRef<boolean>(false);
+  const [statusBubblePositions, setStatusBubblePositions] = useState<Array<{id: string, x: number, y: number, status: string}>>([]);
   const onNodeSelectRef = useRef(onNodeSelect);
   const onEdgeSelectRef = useRef(onEdgeSelect);
   const [internalSelectedNodeId, setInternalSelectedNodeId] = useState<string | null>(null);
@@ -419,6 +422,32 @@ export default function GraphVisualizer({
     }
   }, [isDarkMode]);
 
+  // Update status bubble positions based on node positions
+  const updateStatusBubblePositions = useCallback(() => {
+    const cy = cyRef.current;
+    if (!cy || !data || cy.destroyed()) return;
+
+    const positions: Array<{id: string, x: number, y: number, status: string}> = [];
+
+    data.nodes.forEach((node) => {
+      const status = (node as any).status;
+      if (status) {
+        const cyNode = cy.getElementById(node.id);
+        if (cyNode && cyNode.length > 0) {
+          const renderedPosition = cyNode.renderedPosition();
+          positions.push({
+            id: node.id,
+            x: renderedPosition.x,
+            y: renderedPosition.y,
+            status: status,
+          });
+        }
+      }
+    });
+
+    setStatusBubblePositions(positions);
+  }, [data]);
+
   // Set up grid drawing on pan/zoom events
   useEffect(() => {
     const cy = cyRef.current;
@@ -428,7 +457,10 @@ export default function GraphVisualizer({
     drawGrid();
 
     // Listen for pan/zoom events
-    const handleViewport = () => drawGrid();
+    const handleViewport = () => {
+      drawGrid();
+      updateStatusBubblePositions();
+    };
     cy.on('pan zoom resize', handleViewport);
 
     // Also redraw on window resize
@@ -442,6 +474,13 @@ export default function GraphVisualizer({
       window.removeEventListener('resize', handleResize);
     };
   }, [isReady, drawGrid]);
+
+  // Update status bubbles when data changes
+  useEffect(() => {
+    if (isReady) {
+      updateStatusBubblePositions();
+    }
+  }, [data, isReady, updateStatusBubblePositions]);
 
   // Redraw grid when dark mode changes
   useEffect(() => {
@@ -673,6 +712,42 @@ export default function GraphVisualizer({
             }
           }}
         />
+
+        {/* Status Bubbles Overlay */}
+        <div
+          ref={statusBubblesRef}
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
+            pointerEvents: 'none',
+            zIndex: 2,
+          }}
+        >
+          {statusBubblePositions.map((bubble) => {
+            const color = (STATUS_COLORS as any)[bubble.status] || '#6B7280';
+            return (
+              <div
+                key={bubble.id}
+                style={{
+                  position: 'absolute',
+                  left: `${bubble.x}px`,
+                  top: `${bubble.y - 15}px`, // Position above the node
+                  transform: 'translate(-50%, -50%)',
+                  width: '12px',
+                  height: '12px',
+                  borderRadius: '50%',
+                  backgroundColor: color,
+                  border: '2px solid white',
+                  boxShadow: '0 1px 3px rgba(0, 0, 0, 0.3)',
+                }}
+                title={`${bubble.status} status`}
+              />
+            );
+          })}
+        </div>
 
       </div>
     </div>

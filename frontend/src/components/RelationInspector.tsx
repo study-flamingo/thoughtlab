@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { graphApi } from '../services/api';
 import type { RelationshipType } from '../types/graph';
+import { RELATIONSHIP_TYPE_DISPLAY } from '../types/graph';
 import { useToast } from './Toast';
 import { AIToolsSection, AIToolButton } from './AIToolsSection';
 
@@ -16,6 +17,14 @@ const RELATIONSHIP_TYPES: RelationshipType[] = [
   'RELATES_TO',
   'OBSERVED_IN',
   'DISCUSSES',
+  'CITES',
+  'DERIVED_FROM',
+  'INSPIRED_BY',
+  'PRECEDES',
+  'CAUSES',
+  'PART_OF',
+  'SIMILAR_TO',
+  'HAS_CHUNK',
 ];
 
 export default function RelationInspector({ relationshipId, onClose }: Props) {
@@ -243,7 +252,7 @@ export default function RelationInspector({ relationshipId, onClose }: Props) {
               >
                 {RELATIONSHIP_TYPES.map((type) => (
                   <option key={type} value={type}>
-                    {type}
+                    {RELATIONSHIP_TYPE_DISPLAY[type]}
                   </option>
                 ))}
               </select>
@@ -324,7 +333,7 @@ export default function RelationInspector({ relationshipId, onClose }: Props) {
                 <option value="">None</option>
                 {RELATIONSHIP_TYPES.map((type) => (
                   <option key={type} value={type}>
-                    {type}
+                    {RELATIONSHIP_TYPE_DISPLAY[type]}
                   </option>
                 ))}
               </select>
@@ -429,7 +438,7 @@ export default function RelationInspector({ relationshipId, onClose }: Props) {
                       }}
                       className={`block w-full px-3 py-2 text-left text-sm text-gray-700 dark:text-gray-200 hover:bg-purple-50 dark:hover:bg-purple-900/30 ${idx === arr.length - 1 ? 'rounded-b-md' : ''}`}
                     >
-                      {type}
+                      {RELATIONSHIP_TYPE_DISPLAY[type]}
                     </button>
                   ))}
                 </div>

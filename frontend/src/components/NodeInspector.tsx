@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { graphApi } from '../services/api';
 import type { LinkItem } from '../types/graph';
+import { useSourceTypes } from '../hooks/useSourceTypes';
 import { useToast } from './Toast';
 import { AIToolsSection, AIToolButton } from './AIToolsSection';
 
@@ -13,6 +14,7 @@ interface Props {
 export default function NodeInspector({ nodeId, onClose }: Props) {
   const queryClient = useQueryClient();
   const { showToast } = useToast();
+  const { data: sourceTypes = [] } = useSourceTypes();
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState<any>({});
   const [showReclassifyDropdown, setShowReclassifyDropdown] = useState(false);
@@ -557,17 +559,9 @@ export default function NodeInspector({ nodeId, onClose }: Props) {
                     placeholder="e.g., paper, article, video..."
                   />
                   <datalist id="source-type-suggestions">
-                    <option value="paper" />
-                    <option value="article" />
-                    <option value="book" />
-                    <option value="website" />
-                    <option value="forum" />
-                    <option value="video" />
-                    <option value="podcast" />
-                    <option value="social media" />
-                    <option value="documentation" />
-                    <option value="report" />
-                    <option value="other" />
+                    {sourceTypes.map((type) => (
+                      <option key={type} value={type} />
+                    ))}
                   </datalist>
                 </>
               ) : (

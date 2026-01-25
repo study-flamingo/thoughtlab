@@ -1,4 +1,5 @@
 from fastapi import APIRouter, HTTPException, Query
+from typing import List
 from app.services.graph_service import graph_service
 from app.db.neo4j import neo4j_conn
 from app.core.config import settings
@@ -24,3 +25,9 @@ async def reset_graph_for_tests():
     async with neo4j_conn.get_session() as session:
         await session.run("MATCH (n) DETACH DELETE n")
     return {"status": "ok"}
+
+
+@router.get("/source-types", response_model=List[str])
+async def get_source_types():
+    """Get all unique source types from database, combined with default suggestions."""
+    return await graph_service.get_unique_source_types()

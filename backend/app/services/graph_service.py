@@ -1157,6 +1157,52 @@ class GraphService:
             )
             return settings.model_dump()
 
+    async def get_unique_source_types(self) -> List[str]:
+        """Get all unique source types from database, combined with default suggestions."""
+        # Default source types that are always available
+        default_types = [
+            "paper",
+            "article",
+            "book",
+            "website",
+            "forum",
+            "video",
+            "podcast",
+            "social media",
+            "documentation",
+            "report",
+            "other",
+        ]
+
+        try:
+            async with neo4j_conn.get_session() as session:
+                result = await session.run(
+                    """
+                    MATCH (s:Source)
+                    WHERE s.source_type IS NOT NULL
+                    RETURN DISTINCT s.source_type as source_type
+                    ORDER BY s.source_type
+                    """
+                )
+
+                # Extract unique source types from database
+                db_types = []
+                async for record in result:
+                    source_type = record.get("source_type")
+                    if source_type and isinstance(source_type, str) and source_type.strip():
+                        db_types.append(source_type.strip())
+
+                # Combine default types with database types, removing duplicates
+                # Use dict.fromkeys to preserve order while removing duplicates
+                all_types = list(dict.fromkeys(default_types + db_types))
+
+                return all_types
+
+        except Exception as e:
+            # If query fails, return just the default types
+            # This ensures the app continues to work even if Neo4j is having issues
+            return default_types
+
 
 # Global service instance
 graph_service = GraphService()
