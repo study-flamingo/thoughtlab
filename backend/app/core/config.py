@@ -1,5 +1,6 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from typing import List, Optional, TYPE_CHECKING
+from pydantic import field_validator
+from typing import List, Optional, Union, TYPE_CHECKING
 from functools import lru_cache
 
 if TYPE_CHECKING:
@@ -11,15 +12,16 @@ class Settings(BaseSettings):
     neo4j_uri: str
     neo4j_user: str
     neo4j_password: str
-    database_url: str
+    database_url: str = ""  # Optional - not currently used
     redis_url: str = "redis://localhost:6379"  # Optional - for caching
-    
+
     # Security
     secret_key: str
-    
+
     # Application
     debug: bool = False
     environment: str = "development"
+    cors_origins: str = ""  # Comma-separated string from env (for Docker)
     cors_allow_origins: List[str] = [
         "http://localhost:5173",
         "http://localhost:5174",
@@ -30,6 +32,20 @@ class Settings(BaseSettings):
         "http://localhost:5179",
         "http://localhost:3000",
     ]
+
+    @field_validator("cors_allow_origins", mode="before")
+    @classmethod
+    def assemble_cors_origins(cls, v, info):
+        """Allow CORS origins to be set via CORS_ORIGINS env var as comma-separated string."""
+        # Check if cors_origins was provided as comma-separated string
+        cors_str = info.data.get("cors_origins", "")
+        if cors_str:
+            # Parse comma-separated string and combine with defaults
+            extra_origins = [o.strip() for o in cors_str.split(",") if o.strip()]
+            if isinstance(v, list):
+                return list(set(v + extra_origins))
+            return extra_origins
+        return v
     
     # LLM (legacy - use AIConfig for new AI features)
     openai_api_key: str = ""

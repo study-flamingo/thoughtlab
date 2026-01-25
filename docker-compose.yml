@@ -18,6 +18,8 @@ services:
       - neo4j_data:/data
       - neo4j_logs:/logs
       - neo4j_import:/var/lib/neo4j/import
+    networks:
+      - thoughtlab-network
     healthcheck:
       test: ["CMD", "cypher-shell", "-u", "neo4j", "-p", "research_graph_password", "RETURN 1"]
       interval: 10s
@@ -32,12 +34,57 @@ services:
       - "6379:6379"
     volumes:
       - redis_data:/data
+    networks:
+      - thoughtlab-network
     command: redis-server --appendonly yes
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: thoughtlab-backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      # Database connections (use container names for networking)
+      NEO4J_URI: bolt://neo4j:7687
+      NEO4J_USER: neo4j
+      NEO4J_PASSWORD: research_graph_password
+      REDIS_URL: redis://redis:6379
+      # Security
+      SECRET_KEY: ${SECRET_KEY:-n7c5r46gprKXB5aa9y_aIbIg85zezM85dnI9134Z46o}
+      # LLM Configuration (pass through from host)
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OLLAMA_API_BASE: ${OLLAMA_API_BASE:-}
+      # Application settings
+      DEBUG: ${DEBUG:-false}
+      ENVIRONMENT: ${ENVIRONMENT:-production}
+      # CORS - allow frontend origins
+      CORS_ORIGINS: "http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173"
+    networks:
+      - thoughtlab-network
+    depends_on:
+      neo4j:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/docs"]
+      interval: 30s
+      timeout: 10s
+      start_period: 10s
+      retries: 3
+
+networks:
+  thoughtlab-network:
+    driver: bridge
 
 volumes:
   neo4j_data:
