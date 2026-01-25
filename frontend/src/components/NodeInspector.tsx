@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { graphApi } from '../services/api';
-import type { GraphNode, LinkItem } from '../types/graph';
+import type { LinkItem } from '../types/graph';
 import { useToast } from './Toast';
 import { AIToolsSection, AIToolButton } from './AIToolsSection';
 
@@ -16,7 +16,6 @@ export default function NodeInspector({ nodeId, onClose }: Props) {
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState<any>({});
   const [showReclassifyDropdown, setShowReclassifyDropdown] = useState(false);
-  const [reclassifyType, setReclassifyType] = useState<string>('');
   const [showMergeModal, setShowMergeModal] = useState(false);
   const [mergeTargetId, setMergeTargetId] = useState<string>('');
   const [mergeStrategy, setMergeStrategy] = useState<'combine' | 'prefer_primary' | 'prefer_secondary'>('combine');
@@ -194,7 +193,6 @@ export default function NodeInspector({ nodeId, onClose }: Props) {
     onSuccess: (response) => {
       showToast(`Reclassified to ${response.data.new_type}`, 'success');
       setShowReclassifyDropdown(false);
-      setReclassifyType('');
       queryClient.invalidateQueries({ queryKey: ['node', nodeId] });
       queryClient.invalidateQueries({ queryKey: ['graph'] });
       queryClient.invalidateQueries({ queryKey: ['activities'] });
@@ -305,39 +303,24 @@ export default function NodeInspector({ nodeId, onClose }: Props) {
 
   if (!nodeId) {
     return (
-      <div className="h-full flex flex-col">
-        <div className="p-4 border-b dark:border-gray-700">
-          <h2 className="font-semibold text-gray-800 dark:text-gray-100">Node Inspector</h2>
-        </div>
-        <div className="flex-1 flex items-center justify-center p-4">
-          <p className="text-sm text-gray-500 dark:text-gray-400">Select a node to view details</p>
-        </div>
+      <div className="flex-1 flex items-center justify-center p-4">
+        <p className="text-sm text-gray-500 dark:text-gray-400">Select a node to view details</p>
       </div>
     );
   }
 
   if (isLoading) {
     return (
-      <div className="h-full flex flex-col">
-        <div className="p-4 border-b dark:border-gray-700">
-          <h2 className="font-semibold text-gray-800 dark:text-gray-100">Node Inspector</h2>
-        </div>
-        <div className="flex-1 flex items-center justify-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-        </div>
+      <div className="flex-1 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
       </div>
     );
   }
 
   if (!node) {
     return (
-      <div className="h-full flex flex-col">
-        <div className="p-4 border-b dark:border-gray-700">
-          <h2 className="font-semibold text-gray-800 dark:text-gray-100">Node Inspector</h2>
-        </div>
-        <div className="flex-1 flex items-center justify-center p-4">
-          <p className="text-sm text-red-500">Node not found</p>
-        </div>
+      <div className="flex-1 flex items-center justify-center p-4">
+        <p className="text-sm text-red-500">Node not found</p>
       </div>
     );
   }
@@ -350,18 +333,7 @@ export default function NodeInspector({ nodeId, onClose }: Props) {
     updateConceptMutation.isPending;
 
   return (
-    <div className="h-full flex flex-col">
-      {/* Header */}
-      <div className="p-4 border-b dark:border-gray-700 flex justify-between items-center">
-        <h2 className="font-semibold text-gray-800 dark:text-gray-100">Node Inspector</h2>
-        <button
-          onClick={onClose}
-          className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-xl leading-none"
-        >
-          ×
-        </button>
-      </div>
-
+    <div className="flex flex-col h-full">
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {/* Node Type Badge */}

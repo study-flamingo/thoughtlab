@@ -26,19 +26,20 @@ vi.mock('./services/api', () => ({
 describe('App', () => {
   it('renders header with title', () => {
     render(<App />);
-    expect(screen.getByText(/toughtlab\.ai/)).toBeInTheDocument();
+    expect(screen.getByText(/thoughtlab\.ai/)).toBeInTheDocument();
   });
 
   it('renders Add Node button', () => {
     render(<App />);
-    expect(screen.getByText('Add Node')).toBeInTheDocument();
+    // The button may show just "Add Node" or icon only on mobile
+    expect(screen.getByRole('button', { name: /add node/i })).toBeInTheDocument();
   });
 
   it('opens modal when Add Node button is clicked', async () => {
     const user = userEvent.setup();
     render(<App />);
 
-    const addButton = screen.getByText('Add Node');
+    const addButton = screen.getByRole('button', { name: /add node/i });
     await user.click(addButton);
 
     expect(screen.getByText('Create New Node')).toBeInTheDocument();
@@ -51,18 +52,22 @@ describe('App', () => {
     expect(screen.getByRole('main')).toBeInTheDocument();
   });
 
-  it('renders ActivityFeed component', () => {
+  it('renders hamburger menu button to access settings', () => {
     render(<App />);
-    expect(screen.getByText('Activities Feed')).toBeInTheDocument();
-  });
-
-  it('renders Settings button', () => {
-    render(<App />);
-    expect(screen.getByText('Settings')).toBeInTheDocument();
+    // Settings is now in the drawer, accessed via hamburger menu
+    expect(screen.getByRole('button', { name: /open menu/i })).toBeInTheDocument();
   });
 
   it('renders Add Relation button', () => {
     render(<App />);
-    expect(screen.getByText('Add Relation')).toBeInTheDocument();
+    // There are two buttons (desktop and mobile variants), find at least one
+    const buttons = screen.getAllByRole('button', { name: /relation/i });
+    expect(buttons.length).toBeGreaterThan(0);
+  });
+
+  it('renders notification bell to toggle activity feed', () => {
+    render(<App />);
+    // Activity feed is hidden by default, accessed via notification bell
+    expect(screen.getByRole('button', { name: /notification/i })).toBeInTheDocument();
   });
 });

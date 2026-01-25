@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback } from 'react';
 import { graphApi } from '../services/api';
 import type {
   Activity,
-  ActivityType,
   SuggestionData,
   ProcessingData,
 } from '../types/activity';
@@ -99,18 +98,24 @@ export default function ActivityFeed({
 
   if (loading) {
     return (
-      <div className="h-full flex flex-col">
-        <ActivityHeader />
-        <div className="flex-1 flex items-center justify-center">
-          <div className="animate-pulse text-gray-500">Loading activities...</div>
-        </div>
+      <div className="flex-1 flex items-center justify-center">
+        <div className="animate-pulse text-gray-500">Loading activities...</div>
       </div>
     );
   }
 
   return (
-    <div className="h-full flex flex-col">
-      <ActivityHeader activityCount={activities.length} />
+    <div className="flex flex-col h-full">
+      {/* Live indicator */}
+      <div className="px-4 py-2 flex items-center justify-end gap-2 border-b border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/50">
+        <span className="relative flex h-2 w-2">
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+          <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+        </span>
+        <span className="text-xs text-gray-500 dark:text-gray-400">
+          Live {activities.length > 0 && `(${activities.length})`}
+        </span>
+      </div>
       
       {error && (
         <div className="px-4 py-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-sm">
@@ -135,27 +140,6 @@ export default function ActivityFeed({
             ))}
           </div>
         )}
-      </div>
-    </div>
-  );
-}
-
-function ActivityHeader({ activityCount = 0 }: { activityCount?: number }) {
-  return (
-    <div className="p-4 border-b border-gray-200 dark:border-gray-700">
-      <div className="flex items-center justify-between">
-        <h2 className="font-semibold text-gray-800 dark:text-gray-100">
-          Activities Feed
-        </h2>
-        <div className="flex items-center gap-2">
-          <span className="relative flex h-2 w-2">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
-          </span>
-          <span className="text-xs text-gray-500 dark:text-gray-400">
-            Live {activityCount > 0 && `(${activityCount})`}
-          </span>
-        </div>
       </div>
     </div>
   );

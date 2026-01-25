@@ -16,6 +16,17 @@ export default {
         'node-concept': '#8B5CF6',
         'node-entity': '#EF4444',
       },
+      zIndex: {
+        // Z-index hierarchy for floating UI elements
+        'graph': '0',
+        'activity': '20',
+        'inspector': '30',
+        'top-bar': '40',
+        'drawer': '50',
+        'chat': '50',
+        'modal': '60',
+        'toast': '70',
+      },
     },
   },
   plugins: [],

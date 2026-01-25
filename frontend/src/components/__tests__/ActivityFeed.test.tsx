@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, waitFor, fireEvent } from '../../test/utils';
+import { render, screen, waitFor } from '../../test/utils';
 import userEvent from '@testing-library/user-event';
 import ActivityFeed from '../ActivityFeed';
 import { graphApi } from '../../services/api';
@@ -79,13 +79,14 @@ describe('ActivityFeed', () => {
     expect(screen.getByText('Loading activities...')).toBeInTheDocument();
   });
 
-  it('renders activity feed header', async () => {
+  it('renders activity feed content area', async () => {
     (graphApi.getActivities as any).mockResolvedValue({ data: [] });
 
     render(<ActivityFeed />);
 
+    // The feed should render with live indicator (header now handled by FloatingPanel wrapper)
     await waitFor(() => {
-      expect(screen.getByText('Activities Feed')).toBeInTheDocument();
+      expect(screen.getByText(/Live/)).toBeInTheDocument();
     });
   });
 
