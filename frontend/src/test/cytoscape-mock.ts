@@ -11,6 +11,7 @@ export const createCytoscapeMock = () => {
   const mockCytoscape = {
     // Core methods
     on: vi.fn(),
+    one: vi.fn(), // Listen to event once
     off: vi.fn(),
     destroy: vi.fn(),
     destroyed: vi.fn(() => false),
@@ -19,6 +20,7 @@ export const createCytoscapeMock = () => {
     fit: vi.fn(),
     zoom: vi.fn(() => 1),
     pan: vi.fn(() => ({ x: 0, y: 0 })),
+    center: vi.fn(),
 
     // Layout methods
     layout: vi.fn(() => ({

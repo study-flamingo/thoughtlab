@@ -10,15 +10,6 @@ vi.mock('cytoscape', () => ({
   default: createCytoscapeModule(),
 }));
 
-// Mock extensions
-vi.mock('cytoscape-grid-guide', () => ({
-  default: vi.fn(),
-}));
-
-vi.mock('cytoscape-navigator', () => ({
-  default: vi.fn(),
-}));
-
 // This is an integration test that focuses on component behavior
 // We mock the API service layer, not the HTTP layer, to test how components respond
 
@@ -133,7 +124,7 @@ describe('GraphVisualizer - Integration Tests', () => {
     });
   });
 
-  it('shows grid snapping indicator', async () => {
+  it('shows empty state when no nodes', async () => {
     // Mock API to return empty graph
     mockApi.getFullGraph.mockResolvedValue({
       data: { nodes: [], edges: [] }
@@ -146,27 +137,16 @@ describe('GraphVisualizer - Integration Tests', () => {
       />
     );
 
-    // Wait for loading to finish - first check if it shows up at all
-    await waitFor(() => {
-      // Check for any of the possible end states, not just loading removal
-      const loading = screen.queryByText('Loading graph...');
-      const empty = screen.queryByText('No nodes yet.');
-      const error = screen.queryByText('Error loading graph');
+    // Wait for loading state to disappear
+    await waitForElementToBeRemoved(() => screen.queryByText('Loading graph...'), {
+      timeout: 5000
+    });
 
-      // If we find any end state, loading has finished
-      expect(loading || empty || error).toBeTruthy();
-    }, { timeout: 10000 });
-
-    // Check if the component shows empty state or grid indicator
-    // The grid indicator might not show if there are no nodes
-    const gridIndicator = screen.queryByText(/Grid snapping enabled/);
-    const emptyState = screen.queryByText('No nodes yet.');
-
-    // We should see at least one of these
-    expect(gridIndicator || emptyState).toBeTruthy();
+    // Check if the component shows empty state
+    expect(screen.getByText('No nodes yet.')).toBeInTheDocument();
   });
 
-  it('creates infinite grid background element', async () => {
+  it('creates canvas grid background element', async () => {
     // Mock API to return empty graph
     mockApi.getFullGraph.mockResolvedValue({
       data: { nodes: [], edges: [] }
@@ -179,16 +159,16 @@ describe('GraphVisualizer - Integration Tests', () => {
       />
     );
 
-    // Wait for component to finish loading
-    await waitFor(() => {
-      const loading = screen.queryByText('Loading graph...');
-      const empty = screen.queryByText('No nodes yet.');
-      const error = screen.queryByText('Error loading graph');
-      expect(loading || empty || error).toBeTruthy();
-    }, { timeout: 10000 });
+    // Wait for loading state to disappear
+    await waitForElementToBeRemoved(() => screen.queryByText('Loading graph...'), {
+      timeout: 5000
+    });
 
     // Check that the component rendered successfully
-    expect(screen.getByText(/No nodes yet\.|Knowledge Graph|Error loading graph/)).toBeTruthy();
+    expect(screen.getByText('No nodes yet.')).toBeInTheDocument();
+
+    // Note: Canvas grid background rendering is tested visually in browser
+    // JSDOM doesn't support canvas, so we can't assert on grid rendering here
   });
 
   it('handles rapid data changes', async () => {
