@@ -1,7 +1,9 @@
 import { useRef, useEffect, useState, useMemo, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import CytoscapeComponent from 'react-cytoscapejs';
-import { type Core } from 'cytoscape';
+import cytoscape, { type Core } from 'cytoscape';
+import 'cytoscape-grid-guide';
+import 'cytoscape-navigator';
 import { graphApi } from '../services/api';
 import type { GraphNode, GraphEdge, NodeType } from '../types/graph';
 import { STATUS_COLORS } from '../types/graph';
@@ -25,7 +27,7 @@ function buildStylesheet(settings?: AppSettings, isDarkMode?: boolean) {
     };
 
   const base: any[] = [
-    // Canvas/core background - transparent so custom grid canvas shows through
+    // Canvas/core background - transparent so grid-guide shows through
     {
       selector: 'core',
       style: {
@@ -107,7 +109,7 @@ export default function GraphVisualizer({
   selectedEdgeId: externalSelectedEdgeId,
 }: Props) {
   const cyRef = useRef<Core | null>(null);
-  const gridCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const navigatorRef = useRef<HTMLDivElement | null>(null);
   const statusBubblesRef = useRef<HTMLDivElement | null>(null);
   const [isReady, setIsReady] = useState<boolean>(false);
   const setupDoneRef = useRef<boolean>(false);
@@ -374,53 +376,6 @@ export default function GraphVisualizer({
     }
   }, [selectedEdgeId, selectedNodeId, isReady, data]);
 
-  // Draw grid on canvas that follows pan/zoom
-  const drawGrid = useCallback(() => {
-    const cy = cyRef.current;
-    const canvas = gridCanvasRef.current;
-    if (!cy || !canvas || cy.destroyed()) return;
-
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    // Get canvas dimensions
-    const container = canvas.parentElement;
-    if (!container) return;
-
-    const width = container.clientWidth;
-    const height = container.clientHeight;
-
-    // Update canvas size if needed
-    if (canvas.width !== width || canvas.height !== height) {
-      canvas.width = width;
-      canvas.height = height;
-    }
-
-    // Clear canvas
-    ctx.clearRect(0, 0, width, height);
-
-    // Get pan and zoom from cytoscape
-    const pan = cy.pan();
-    const zoom = cy.zoom();
-    const gridSpacing = 20;
-
-    // Calculate grid offset based on pan
-    const offsetX = pan.x % (gridSpacing * zoom);
-    const offsetY = pan.y % (gridSpacing * zoom);
-
-    // Set grid style
-    ctx.fillStyle = isDarkMode ? '#374151' : '#D1D5DB';
-
-    // Draw dots
-    const dotSize = 1.5;
-    for (let x = offsetX; x < width; x += gridSpacing * zoom) {
-      for (let y = offsetY; y < height; y += gridSpacing * zoom) {
-        ctx.beginPath();
-        ctx.arc(x, y, dotSize, 0, Math.PI * 2);
-        ctx.fill();
-      }
-    }
-  }, [isDarkMode]);
 
   // Update status bubble positions based on node positions
   const updateStatusBubblePositions = useCallback(() => {
@@ -448,32 +403,23 @@ export default function GraphVisualizer({
     setStatusBubblePositions(positions);
   }, [data]);
 
-  // Set up grid drawing on pan/zoom events
+  // Set up status bubble updates on pan/zoom events
   useEffect(() => {
     const cy = cyRef.current;
     if (!cy || !isReady || cy.destroyed()) return;
 
-    // Initial draw
-    drawGrid();
-
-    // Listen for pan/zoom events
+    // Listen for pan/zoom events to update status bubbles
     const handleViewport = () => {
-      drawGrid();
       updateStatusBubblePositions();
     };
     cy.on('pan zoom resize', handleViewport);
-
-    // Also redraw on window resize
-    const handleResize = () => drawGrid();
-    window.addEventListener('resize', handleResize);
 
     return () => {
       if (cy && !cy.destroyed()) {
         cy.off('pan zoom resize', handleViewport);
       }
-      window.removeEventListener('resize', handleResize);
     };
-  }, [isReady, drawGrid]);
+  }, [isReady, updateStatusBubblePositions]);
 
   // Update status bubbles when data changes
   useEffect(() => {
@@ -482,10 +428,22 @@ export default function GraphVisualizer({
     }
   }, [data, isReady, updateStatusBubblePositions]);
 
-  // Redraw grid when dark mode changes
+
+  // Update grid-guide when dark mode changes
   useEffect(() => {
-    drawGrid();
-  }, [isDarkMode, drawGrid]);
+    const cy = cyRef.current;
+    if (!cy || !isReady || cy.destroyed()) return;
+
+    try {
+      // Update grid-guide configuration for dark mode
+      (cy as any).gridGuide({
+        gridColor: isDarkMode ? '#374151' : '#D1D5DB',
+      });
+    } catch (error) {
+      // Grid might not be initialized yet, which is fine
+      console.debug('Grid not available for dark mode update:', error);
+    }
+  }, [isDarkMode, isReady]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -603,19 +561,7 @@ export default function GraphVisualizer({
 
       {/* Cytoscape Graph */}
       <div className="flex-1 relative" style={{ backgroundColor: isDarkMode ? '#111827' : '#ffffff' }}>
-        {/* Grid canvas layer - positioned behind Cytoscape */}
-        <canvas
-          ref={gridCanvasRef}
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            width: '100%',
-            height: '100%',
-            pointerEvents: 'none',
-            zIndex: 0,
-          }}
-        />
+        {/* Grid layer - provided by cytoscape-grid-guide extension */}
         <CytoscapeComponent
           elements={elements}
           stylesheet={stylesheet as any}
@@ -672,7 +618,37 @@ export default function GraphVisualizer({
                 cy.minZoom(0.1);
                 cy.maxZoom(2);
 
-                // Grid is now drawn via custom canvas layer (see drawGrid callback)
+                // Configure cytoscape-grid-guide
+                try {
+                  (cy as any).gridGuide({
+                    drawGrid: true,
+                    gridSpacing: 20,
+                    gridColor: isDarkMode ? '#374151' : '#D1D5DB',
+                    lineWidth: 1,
+                    panGrid: true,
+                    gridStackOrder: -1, // Behind nodes
+                    snapToGridOnRelease: false,
+                    snapToGridDuringDrag: false, // Visual only
+                  });
+                } catch (error) {
+                  console.warn('Failed to configure grid-guide:', error);
+                }
+
+                // Configure cytoscape-navigator
+                try {
+                  if (navigatorRef.current) {
+                    (cy as any).navigator({
+                      container: navigatorRef.current,
+                      viewLiveFramerate: 0,
+                      thumbnailEventFramerate: 30,
+                      thumbnailLiveFramerate: 30,
+                      dblClickDelay: 200,
+                      removeCustomContainer: false,
+                    });
+                  }
+                } catch (error) {
+                  console.warn('Failed to configure navigator:', error);
+                }
 
                 setupDoneRef.current = true;
                 setIsReady(true);
@@ -749,6 +725,16 @@ export default function GraphVisualizer({
           })}
         </div>
 
+        {/* Navigator (Minimap) */}
+        <div
+          ref={navigatorRef}
+          className="absolute bottom-4 right-4 w-[150px] h-[150px] border rounded shadow-lg"
+          style={{
+            backgroundColor: isDarkMode ? '#1f2937' : '#ffffff',
+            borderColor: isDarkMode ? '#374151' : '#d1d5db',
+            zIndex: 3,
+          }}
+        />
       </div>
     </div>
   );

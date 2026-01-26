@@ -267,19 +267,34 @@ OPTIONS {indexConfig: {
 
 ### 4. Run Development Servers
 
-**Option A - Use Start Scripts (Recommended):**
+**Option A - Containerized Development (New & Recommended):**
+
+Run all services (backend, frontend, Neo4j, Redis) in Docker containers:
+
+```bash
+# From project root
+./start-dev.sh
+```
+
+This provides:
+- Isolated environment for all services
+- Automatic networking between frontend and backend
+- Hot reloading for both frontend and backend
+- Consistent dependencies across all developers
+
+**Option B - Use Start Scripts:**
 
 Linux/macOS/WSL/Git Bash:
 ```bash
-./start.sh      # Starts both backend and frontend
+./start.sh      # Starts both backend and frontend (local frontend, containerized backend)
 ```
 
 Windows PowerShell:
 ```powershell
-.\start.ps1     # Starts both backend and frontend
+.\start.ps1     # Starts both backend and frontend (local frontend, containerized backend)
 ```
 
-**Option B - Manual Control (Better for Debugging):**
+**Option C - Manual Control (Better for Debugging):**
 
 **Terminal 1 - Backend**:
 
@@ -1367,6 +1382,42 @@ npm test -- --run  # Verify tests pass
 ---
 
 ## Troubleshooting
+
+### Containerized Development (Docker)
+
+For detailed containerized development troubleshooting, see [frontend/DOCKER_DEV.md](frontend/DOCKER_DEV.md).
+
+**Frontend container won't start**:
+```bash
+# Check logs
+docker-compose logs frontend
+
+# Common issues:
+# 1. Port 5173 already in use locally
+# 2. Node module permission issues
+# 3. Network connectivity problems
+```
+
+**API calls from frontend fail**:
+- Ensure frontend uses `http://backend:8000/api/v1` (not localhost)
+- Check backend CORS configuration includes `http://frontend:80` and `http://localhost:5173`
+- Verify backend is healthy: `curl http://localhost:8000/health`
+
+**Hot reload not working**:
+```bash
+# Check if volumes are properly mounted
+docker-compose exec frontend ls /app
+
+# Restart frontend container
+docker-compose restart frontend
+```
+
+**Network errors after switching to Docker**:
+```bash
+# Clean restart
+docker-compose down
+docker-compose up --build -d
+```
 
 ### Backend Issues
 

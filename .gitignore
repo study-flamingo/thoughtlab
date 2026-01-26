@@ -74,3 +74,4 @@ test_*.py
 # Playwright MCP
 .playwright-mcp/
 
+.claude/settings.local.json

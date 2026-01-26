@@ -28,13 +28,14 @@ A web-based research application that helps you discover meaningful connections 
 
 ```bash
 # Linux/Mac/WSL/Git Bash
-./setup.sh
+./scripts/setup.sh
 
 # Windows (PowerShell)
 .\scripts\setup.ps1
 ```
 
 This will:
+- ✅ Choose your development mode (Docker, Mixed, or Local)
 - ✅ Install Python dependencies (using uv)
 - ✅ Install Node.js dependencies
 - ✅ Create and configure `.env` files
@@ -44,17 +45,20 @@ This will:
 ### Start the App
 
 ```bash
-./start.sh
+./scripts/start.sh
 ```
 
-This starts both backend and frontend servers. Open **<http://localhost:5173>** in your browser.
+This starts backend and frontend servers. Open **<http://localhost:5173>** in your browser.
 
 ### Other Commands
 
 ```bash
-./stop.sh      # Stop all servers
-./restart.sh   # Restart all servers
+./scripts/stop.sh         # Stop all servers
+./scripts/restart.sh      # Restart all servers
+./scripts/start-docker.sh # Start fully containerized
 ```
+
+**For detailed script documentation, see [SCRIPTS.md](SCRIPTS.md) or [docs/SCRIPTS.md](docs/SCRIPTS.md).**
 
 ## Manual Setup
 

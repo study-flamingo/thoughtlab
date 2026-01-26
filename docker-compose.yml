@@ -67,7 +67,7 @@ services:
       DEBUG: ${DEBUG:-false}
       ENVIRONMENT: ${ENVIRONMENT:-production}
       # CORS - allow frontend origins
-      CORS_ORIGINS: "http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173"
+      CORS_ORIGINS: "http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173,http://frontend:80"
     networks:
       - thoughtlab-network
     depends_on:
@@ -81,6 +81,32 @@ services:
       timeout: 10s
       start_period: 10s
       retries: 3
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    container_name: thoughtlab-frontend
+    restart: unless-stopped
+    ports:
+      - "5173:5173"
+    environment:
+      VITE_API_URL: "http://backend:8000/api/v1"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    networks:
+      - thoughtlab-network
+    depends_on:
+      - backend
+    stdin_open: true
+    tty: true
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:5173"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
 networks:
   thoughtlab-network:
