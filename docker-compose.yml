@@ -66,8 +66,8 @@ services:
       # Application settings
       DEBUG: ${DEBUG:-false}
       ENVIRONMENT: ${ENVIRONMENT:-production}
-      # CORS - allow frontend origins
-      CORS_ORIGINS: "http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173,http://frontend:80"
+      # CORS - allow frontend origins (includes both local and containerized access)
+      CORS_ORIGINS: "http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173,http://frontend:5173,http://frontend:80"
     networks:
       - thoughtlab-network
     depends_on:
@@ -91,7 +91,8 @@ services:
     ports:
       - "5173:5173"
     environment:
-      VITE_API_URL: "http://localhost:8000/api/v1"
+      # Vite proxy target - use Docker service name for container-to-container communication
+      VITE_PROXY_TARGET: "http://backend:8000"
     volumes:
       - ./frontend:/app
       - /app/node_modules
@@ -102,7 +103,7 @@ services:
     stdin_open: true
     tty: true
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:5173"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:5173"]
       interval: 10s
       timeout: 5s
       retries: 5

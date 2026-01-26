@@ -57,11 +57,20 @@ Once running, you can access:
 
 ## Environment Configuration
 
-The frontend container uses these environment variables:
+### API Proxy Configuration
 
-- `VITE_API_URL`: "http://backend:8000/api/v1" (internal Docker network)
+The frontend uses a **Vite proxy** to route API requests to the backend, avoiding CORS issues entirely:
 
-The backend container now includes `http://frontend:80` in its CORS configuration.
+- **Containerized mode**: `VITE_PROXY_TARGET=http://backend:8000` (Docker service name)
+- **Local development**: Defaults to `http://localhost:8000`
+
+The React app makes requests to `/api/v1/...` (relative paths), and Vite proxies them to the backend. This setup:
+- Avoids CORS issues completely
+- Works for both containerized and mixed development modes
+- Uses clean relative URLs in the codebase
+
+The backend also includes CORS configuration for direct access if needed:
+- `http://localhost:5173`, `http://localhost:3000`, `http://127.0.0.1:5173`, `http://frontend:5173`, `http://frontend:80`
 
 ## Development Workflow
 
@@ -108,8 +117,9 @@ docker-compose restart frontend
 ### API Calls Fail
 
 1. **Check backend**: `docker-compose logs backend`
-2. **Network connectivity**: Frontend should use `http://backend:8000` (not localhost)
-3. **CORS**: Backend should allow `http://frontend:80` and `http://localhost:5173`
+2. **Check proxy**: API calls use relative paths (`/api/v1/...`) - Vite proxies to backend
+3. **Verify proxy target**: Check `VITE_PROXY_TARGET` in docker-compose.yml
+4. **Test directly**: `curl http://localhost:5173/api/v1/graph/full` should return data
 
 ### Hot Reload Not Working
 
@@ -186,7 +196,7 @@ docker run -p 80:80 thoughtlab-frontend:latest
 If you were previously running frontend locally:
 
 1. **Stop local frontend**: Kill any processes using port 5173
-2. **Update API URL**: The frontend now uses `http://backend:8000/api/v1` internally
+2. **API proxy**: The frontend now uses relative URLs (`/api/v1/...`) with Vite proxy
 3. **Clear cache**: Remove `.vite` cache directory if needed
 4. **Rebuild**: Run `docker-compose up --build -d`
 

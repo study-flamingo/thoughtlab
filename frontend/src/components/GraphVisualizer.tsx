@@ -1,472 +1,291 @@
-import { useRef, useEffect, useState, useMemo, useCallback } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import CytoscapeComponent from 'react-cytoscapejs';
-import cytoscape, { type Core } from 'cytoscape';
-import 'cytoscape-grid-guide';
-import 'cytoscape-navigator';
+import React, { useEffect, useRef, useState } from 'react';
+import Cytoscape from 'cytoscape';
+import { getExtendedCytoscape } from '../lib/cytoscape-extensions';
 import { graphApi } from '../services/api';
-import type { GraphNode, GraphEdge, NodeType } from '../types/graph';
-import { STATUS_COLORS } from '../types/graph';
-import type { AppSettings, RelationStyle } from '../types/settings';
+import type { GraphData, NodeType } from '../types/graph';
 
-const NODE_TYPES: NodeType[] = ['Observation', 'Hypothesis', 'Source', 'Concept', 'Entity'];
+interface GraphVisualizerProps {
+  onNodeSelect: (id: string | null) => void;
+  onEdgeSelect: (id: string | null) => void;
+  selectedNodeId?: string | null;
+  selectedEdgeId?: string | null;
+}
 
-function buildStylesheet(settings?: AppSettings, isDarkMode?: boolean) {
-  const nodeColors = settings?.node_colors || {
+const GraphVisualizer: React.FC<GraphVisualizerProps> = ({
+  onNodeSelect,
+  onEdgeSelect,
+  selectedNodeId,
+  selectedEdgeId,
+}) => {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const cyRef = useRef<Cytoscape.Core | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [data, setData] = useState<GraphData | null>(null);
+
+  // Node type colors
+  const nodeColors: Record<NodeType, string> = {
     Observation: '#60A5FA',
     Hypothesis: '#34D399',
     Source: '#FBBF24',
     Concept: '#A78BFA',
     Entity: '#F87171',
   };
-  const relationStyles: Record<string, RelationStyle> =
-    (settings?.relation_styles as Record<string, RelationStyle>) || {
-      SUPPORTS: { line_color: '#10B981', target_arrow_color: '#10B981', width: 3, target_arrow_shape: 'triangle' },
-      CONTRADICTS: { line_color: '#EF4444', target_arrow_color: '#EF4444', width: 3, line_style: 'dashed', target_arrow_shape: 'tee' },
-      RELATES_TO: { line_color: '#6B7280', target_arrow_color: '#6B7280', width: 2, target_arrow_shape: 'triangle' },
-    };
 
-  const base: any[] = [
-    // Canvas/core background - transparent so grid-guide shows through
-    {
-      selector: 'core',
-      style: {
-        'background-color': 'transparent',
-      },
-    },
-    {
-      selector: 'node',
-      style: {
-        label: 'data(label)',
-        'text-valign': 'center',
-        'text-halign': 'center',
-        color: '#fff',
-        'font-size': '10px',
-        width: '40px',
-        height: '40px',
-        'text-wrap': 'wrap',
-        'text-max-width': '80px',
-        'text-overflow-wrap': 'whitespace',
-      },
-    },
-    {
-      selector: 'edge',
-      style: {
-        width: 2,
-        'line-color': isDarkMode ? '#4B5563' : '#cccccc', // gray-600 on dark
-        'target-arrow-color': isDarkMode ? '#4B5563' : '#cccccc',
-        'target-arrow-shape': 'triangle',
-        'curve-style': 'bezier',
-        ...(settings?.show_edge_labels ? { label: 'data(type)' } : {}),
-        'font-size': '8px',
-        // Relation text color
-        color: isDarkMode ? '#ffffff' : '#374151', // white on dark, gray-700 on light
-        'text-rotation': 'autorotate',
-        'text-margin-y': -10,
-      },
-    },
-  ];
-
-  const nodeTypeRules = [
-    { type: 'Observation', shape: 'ellipse' },
-    { type: 'Hypothesis', shape: 'diamond' },
-    { type: 'Source', shape: 'rectangle' },
-    { type: 'Concept', shape: 'hexagon' },
-    { type: 'Entity', shape: 'round-rectangle' },
-  ].map(({ type, shape }) => ({
-    selector: `node[type="${type}"]`,
-    style: {
-      'background-color': (nodeColors as any)[type] || '#666',
-      shape,
-    },
-  }));
-
-  const edgeTypeRules = Object.entries(relationStyles).map(([relType, style]) => ({
-    selector: `edge[type="${relType}"]`,
-    style: {
-      ...(style.line_color ? { 'line-color': style.line_color } : {}),
-      ...(style.target_arrow_color ? { 'target-arrow-color': style.target_arrow_color } : {}),
-      ...(style.width ? { width: style.width } : {}),
-      ...(style.line_style ? { 'line-style': style.line_style } : {}),
-      ...(style.target_arrow_shape ? { 'target-arrow-shape': style.target_arrow_shape } : {}),
-    },
-  }));
-
-  return [...base, ...nodeTypeRules, ...edgeTypeRules];
-}
-
-interface Props {
-  onNodeSelect?: (nodeId: string | null) => void;
-  selectedNodeId?: string | null;
-  onEdgeSelect?: (edgeId: string | null) => void;
-  selectedEdgeId?: string | null;
-}
-
-export default function GraphVisualizer({
-  onNodeSelect,
-  selectedNodeId: externalSelectedNodeId,
-  onEdgeSelect,
-  selectedEdgeId: externalSelectedEdgeId,
-}: Props) {
-  const cyRef = useRef<Core | null>(null);
-  const navigatorRef = useRef<HTMLDivElement | null>(null);
-  const statusBubblesRef = useRef<HTMLDivElement | null>(null);
-  const [isReady, setIsReady] = useState<boolean>(false);
-  const setupDoneRef = useRef<boolean>(false);
-  const [statusBubblePositions, setStatusBubblePositions] = useState<Array<{id: string, x: number, y: number, status: string}>>([]);
-  const onNodeSelectRef = useRef(onNodeSelect);
-  const onEdgeSelectRef = useRef(onEdgeSelect);
-  const [internalSelectedNodeId, setInternalSelectedNodeId] = useState<string | null>(null);
-  const [internalSelectedEdgeId, setInternalEdgeId] = useState<string | null>(null);
-  const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
-    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return false;
-    try {
-      return window.matchMedia('(prefers-color-scheme: dark)').matches;
-    } catch {
-      return false;
-    }
-  });
-  // Sync with system preference changes
+  // Load graph data
   useEffect(() => {
-    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
-    const media = window.matchMedia('(prefers-color-scheme: dark)');
-    const handler = (event: MediaQueryListEvent | MediaQueryList) => {
-      const matches = ('matches' in event ? event.matches : (event as MediaQueryList).matches);
-      setIsDarkMode(matches);
-    };
-    try {
-      // Modern
-      media.addEventListener('change', handler as EventListener);
-      // Initialize on mount (Safari sometimes needs immediate read)
-      setIsDarkMode(media.matches);
-      return () => media.removeEventListener('change', handler as EventListener);
-    } catch {
-      // Legacy Safari
-      (media as any).addListener(handler as any);
-      return () => (media as any).removeListener(handler as any);
-    }
-  }, []);
-  
-  // Keep the refs updated with the latest callbacks
-  useEffect(() => {
-    onNodeSelectRef.current = onNodeSelect;
-  }, [onNodeSelect]);
-  
-  useEffect(() => {
-    onEdgeSelectRef.current = onEdgeSelect;
-  }, [onEdgeSelect]);
-  
-  // Use external selectedNodeId if provided, otherwise use internal state
-  const selectedNodeId = externalSelectedNodeId !== undefined ? externalSelectedNodeId : internalSelectedNodeId;
-  const selectedEdgeId = externalSelectedEdgeId !== undefined ? externalSelectedEdgeId : internalSelectedEdgeId;
-  
-  const setSelectedNodeId = (id: string | null) => {
-    if (onNodeSelectRef.current) {
-      onNodeSelectRef.current(id);
-    } else {
-      setInternalSelectedNodeId(id);
-    }
-  };
+    let mounted = true;
 
-  const setSelectedEdgeId = (id: string | null) => {
-    if (onEdgeSelectRef.current) {
-      onEdgeSelectRef.current(id);
-    } else {
-      setInternalEdgeId(id);
-    }
-  };
-
-  const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['graph', 'full'],
-    queryFn: async () => {
-      const response = await graphApi.getFullGraph();
-      return response.data;
-    },
-  });
-
-  const { data: settingsResponse } = useQuery({
-    queryKey: ['settings'],
-    queryFn: async () => {
-      const response = await graphApi.getSettings();
-      return response.data as AppSettings;
-    },
-  });
-
-  const stylesheet = useMemo(() => buildStylesheet(settingsResponse, isDarkMode), [settingsResponse, isDarkMode]);
-
-  // Convert graph data to Cytoscape elements format
-  const elements = data
-    ? [
-        // Nodes
-        ...data.nodes.map((node: GraphNode) => {
-          // Determine label based on node type
-          let label = node.id.substring(0, 8);
-          if (node.text) {
-            label = node.text.substring(0, 30) + (node.text.length > 30 ? '...' : '');
-          } else if (node.title) {
-            label = node.title.substring(0, 30) + (node.title.length > 30 ? '...' : '');
-          } else if (node.name) {
-            label = node.name.substring(0, 30) + (node.name.length > 30 ? '...' : '');
-          }
-          
-          return {
-            data: {
-              ...node,
-              label,
-            },
-          };
-        }),
-        // Edges
-        ...data.edges.map((edge: GraphEdge) => {
-          // Use the edge ID from backend (Neo4j internal ID, can be "0", "1", etc.)
-          // If missing, create a composite key as fallback
-          const edgeId = edge.id !== undefined && edge.id !== null ? String(edge.id) : `edge-${edge.source}-${edge.target}-${edge.type}`;
-          return {
-            data: {
-              ...edge,
-              // Override with our computed id to ensure it's set properly
-              id: edgeId,
-            },
-          };
-        }),
-      ]
-    : [];
-
-  // Set up tap handler when Cytoscape instance and data are ready
-  useEffect(() => {
-    const cy = cyRef.current;
-    if (!cy || cy.destroyed() || !data || !isReady) {
-      return;
-    }
-
-    const handleTap = (event: cytoscape.EventObject) => {
+    const loadGraph = async () => {
       try {
-        const target = event.target as any;
+        setLoading(true);
+        setError(null);
 
-        // Background/core taps: deselect
-        if (target === cy || typeof target?.isNode !== 'function') {
-          setSelectedNodeId(null);
-          setSelectedEdgeId(null);
-          if (!cy.destroyed()) {
-            cy.elements().removeClass('highlighted');
-          }
-          return;
+        const response = await graphApi.getFullGraph();
+        if (mounted) {
+          setData(response.data);
+          setLoading(false);
         }
-
-        // Node taps: select and highlight
-        if (target.isNode()) {
-          const nodeId = target.data('id') || target.id();
-          setSelectedNodeId(nodeId);
-          setSelectedEdgeId(null);
-          if (!cy.destroyed()) {
-            cy.elements().removeClass('highlighted');
-            target.addClass('highlighted');
-            target.neighborhood().addClass('highlighted');
-          }
-          return;
+      } catch (err) {
+        if (mounted) {
+          setError(err instanceof Error ? err.message : 'Failed to load graph');
+          setLoading(false);
         }
-
-        // Edge taps: select and highlight
-        if (target.isEdge()) {
-          const edgeId = target.data('id');
-          // Check for null/undefined explicitly (not truthiness, since "0" is falsy)
-          if (edgeId !== null && edgeId !== undefined && !String(edgeId).startsWith('edge-')) {
-            setSelectedEdgeId(String(edgeId));
-            setSelectedNodeId(null);
-            if (!cy.destroyed()) {
-              cy.elements().removeClass('highlighted');
-              target.addClass('highlighted');
-              target.source().addClass('highlighted');
-              target.target().addClass('highlighted');
-            }
-          }
-          return;
-        }
-
-        // Other element taps: deselect
-        setSelectedNodeId(null);
-        setSelectedEdgeId(null);
-        if (!cy.destroyed()) {
-          cy.elements().removeClass('highlighted');
-        }
-      } catch (error) {
-        console.warn('Error handling tap event:', error);
       }
     };
 
-    cy.off('tap');
-    cy.on('tap', handleTap);
+    loadGraph();
 
     return () => {
-      if (cy && !cy.destroyed()) {
-        try {
-          cy.off('tap', handleTap);
-        } catch (error) {
-          console.warn('Error removing tap handler:', error);
-        }
-      }
+      mounted = false;
     };
-  }, [data, isReady]);
-
-  // Add highlight styles
-  useEffect(() => {
-    const cy = cyRef.current;
-    if (!cy || !isReady || cy.destroyed()) return;
-
-    try {
-      cy.style().append([
-        {
-          selector: 'node.highlighted',
-          style: {
-            'border-width': 3,
-            'border-color': '#F59E0B',
-            'background-color': (ele: cytoscape.NodeSingular) => {
-              const type = ele.data('type');
-              const colors: Record<string, string> = {
-                Observation: '#60A5FA',
-                Hypothesis: '#34D399',
-                Source: '#FBBF24',
-                Concept: '#A78BFA',
-                Entity: '#F87171',
-              };
-              return colors[type] || '#666';
-            },
-          },
-        },
-        {
-          selector: 'edge.highlighted',
-          style: {
-            'line-color': '#F59E0B',
-            'target-arrow-color': '#F59E0B',
-            width: 4,
-            'z-index': 10,
-          },
-        },
-      ]);
-    } catch (error) {
-      console.warn('Failed to append highlight styles:', error);
-    }
   }, []);
 
-  // Update highlight based on selected edge
+  // Initialize Cytoscape
   useEffect(() => {
-    const cy = cyRef.current;
-    if (!cy || !isReady || cy.destroyed() || !data) return;
+    if (!containerRef.current || !data || loading) return;
 
+    // Register extensions (ensures they're available)
+    getExtendedCytoscape();
+
+    // Initialize Cytoscape instance
+    const cy = Cytoscape({
+      container: containerRef.current,
+      elements: [
+        ...data.nodes.map((node) => ({
+          data: {
+            id: node.id,
+            label: node.text,
+            type: node.type,
+            confidence: node.confidence,
+          },
+        })),
+        ...data.edges.map((edge) => ({
+          data: {
+            id: edge.id,
+            source: edge.source,
+            target: edge.target,
+            label: edge.type,
+          },
+        })),
+      ],
+      style: [
+        {
+          selector: 'node',
+          style: {
+            'background-color': (ele) =>
+              nodeColors[ele.data('type') as NodeType] || '#6B7280',
+            'label': 'data(label)',
+            'color': '#fff',
+            'text-outline-width': 2,
+            'text-outline-color': '#000',
+            'width': 40,
+            'height': 40,
+            'font-size': 12,
+          },
+        },
+        {
+          selector: 'edge',
+          style: {
+            'width': 2,
+            'line-color': '#9CA3AF',
+            'target-arrow-color': '#9CA3AF',
+            'target-arrow-shape': 'triangle',
+            'curve-style': 'bezier',
+            'label': 'data(label)',
+            'font-size': 10,
+            'text-rotation': 'autorotate',
+            'text-background-opacity': 1,
+            'text-background-color': '#1F2937',
+            'text-background-padding': '2px',
+          },
+        },
+        {
+          selector: ':selected',
+          style: {
+            'border-width': 3,
+            'border-color': '#3B82F6',
+          },
+        },
+      ],
+      layout: {
+        name: 'cose',
+        animate: true,
+        animationDuration: 500,
+        padding: 50,
+      },
+      wheelSensitivity: 0.2,
+    });
+
+    // Store reference
+    cyRef.current = cy;
+
+    // Initialize infinite dot grid using modular CSS arithmetic
     try {
-      // Remove all highlights first
-      cy.elements().removeClass('highlighted');
-      
-      if (selectedEdgeId !== null && selectedEdgeId !== undefined) {
-        const edge = cy.getElementById(selectedEdgeId);
-        if (edge.length > 0) {
-          edge.addClass('highlighted');
-          edge.source().addClass('highlighted');
-          edge.target().addClass('highlighted');
-        }
-      } else if (selectedNodeId !== null && selectedNodeId !== undefined) {
-        const node = cy.getElementById(selectedNodeId);
-        if (node.length > 0) {
-          node.addClass('highlighted');
-          node.neighborhood().addClass('highlighted');
-        }
+      const gridSpacing = 25;
+      const dotSize = 2.5;
+      const dotColor = '#D1D5DB';
+
+      const container = cy.container();
+      if (container) {
+        // Clean up any existing grid
+        const existingGrid = container.querySelector('.css-dot-grid-bg');
+        if (existingGrid) existingGrid.remove();
+
+        // Create grid element
+        const gridDiv = document.createElement('div');
+        gridDiv.className = 'css-dot-grid-bg';
+        gridDiv.style.cssText = `
+          position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+          pointer-events: none; z-index: 0; opacity: 0.7;
+          background-image: radial-gradient(circle, ${dotColor} ${dotSize}px, transparent ${dotSize + 1}px);
+          background-size: ${gridSpacing}px ${gridSpacing}px;
+        `;
+
+        container.style.position = 'relative';
+        container.insertBefore(gridDiv, container.firstChild);
+
+        // Make Cytoscape canvas transparent
+        const cyCanvas = container.querySelector('canvas');
+        if (cyCanvas) cyCanvas.style.backgroundColor = 'transparent';
+
+        // Modular arithmetic for infinite grid effect
+        const updateGrid = () => {
+          if (cy?.destroyed()) return;
+          const { x, y } = cy.pan();
+          const zoom = cy.zoom();
+          const scaled = gridSpacing * zoom;
+          const offset = (p: number) => ((p % scaled) + scaled) % scaled;
+          gridDiv.style.backgroundPosition = `${offset(x)}px ${offset(y)}px`;
+          gridDiv.style.backgroundSize = `${scaled}px ${scaled}px`;
+        };
+
+        cy.on('zoom pan resize', () => requestAnimationFrame(updateGrid));
+        (cy as any)._gridEventHandler = updateGrid;
+        updateGrid();
       }
     } catch (error) {
-      console.warn('Error updating highlights:', error);
+      console.error('Grid init failed:', error);
     }
-  }, [selectedEdgeId, selectedNodeId, isReady, data]);
 
+    // Initialize gridGuide for snapping (without drawing grid lines)
+    try {
+      if (typeof cy.gridGuide === 'function') {
+        cy.gridGuide({
+          // Don't draw the line grid (we're using CSS dot grid)
+          drawGrid: false,
 
-  // Update status bubble positions based on node positions
-  const updateStatusBubblePositions = useCallback(() => {
-    const cy = cyRef.current;
-    if (!cy || !data || cy.destroyed()) return;
+          // Snapping behavior
+          snapToGridOnRelease: true,
+          snapToGridDuringDrag: false, // Smoother dragging, snap on release
 
-    const positions: Array<{id: string, x: number, y: number, status: string}> = [];
+          // Grid spacing must match our CSS grid
+          gridSpacing: 25,
+        });
+      }
+    } catch (error) {
+      // Grid guide snapping is optional, fail silently
+    }
 
-    data.nodes.forEach((node) => {
-      const status = (node as any).status;
-      if (status) {
-        const cyNode = cy.getElementById(node.id);
-        if (cyNode && cyNode.length > 0) {
-          const renderedPosition = cyNode.renderedPosition();
-          positions.push({
-            id: node.id,
-            x: renderedPosition.x,
-            y: renderedPosition.y,
-            status: status,
-          });
-        }
+    // Event handlers
+    cy.on('tap', 'node', (evt) => {
+      const node = evt.target;
+      onNodeSelect(node.id());
+    });
+
+    cy.on('tap', 'edge', (evt) => {
+      const edge = evt.target;
+      onEdgeSelect(edge.id());
+    });
+
+    cy.on('tap', (evt) => {
+      if (evt.target === cy) {
+        onNodeSelect(null);
+        onEdgeSelect(null);
       }
     });
 
-    setStatusBubblePositions(positions);
-  }, [data]);
-
-  // Set up status bubble updates on pan/zoom events
-  useEffect(() => {
-    const cy = cyRef.current;
-    if (!cy || !isReady || cy.destroyed()) return;
-
-    // Listen for pan/zoom events to update status bubbles
-    const handleViewport = () => {
-      updateStatusBubblePositions();
-    };
-    cy.on('pan zoom resize', handleViewport);
-
-    return () => {
-      if (cy && !cy.destroyed()) {
-        cy.off('pan zoom resize', handleViewport);
+    // Handle resize
+    const handleResize = () => {
+      if (cyRef.current) {
+        cyRef.current.resize();
+        cyRef.current.fit();
       }
     };
-  }, [isReady, updateStatusBubblePositions]);
 
-  // Update status bubbles when data changes
-  useEffect(() => {
-    if (isReady) {
-      updateStatusBubblePositions();
-    }
-  }, [data, isReady, updateStatusBubblePositions]);
+    window.addEventListener('resize', handleResize);
 
-
-  // Update grid-guide when dark mode changes
-  useEffect(() => {
-    const cy = cyRef.current;
-    if (!cy || !isReady || cy.destroyed()) return;
-
-    try {
-      // Update grid-guide configuration for dark mode
-      (cy as any).gridGuide({
-        gridColor: isDarkMode ? '#374151' : '#D1D5DB',
-      });
-    } catch (error) {
-      // Grid might not be initialized yet, which is fine
-      console.debug('Grid not available for dark mode update:', error);
-    }
-  }, [isDarkMode, isReady]);
-
-  // Cleanup on unmount
-  useEffect(() => {
+    // Cleanup
     return () => {
-      const cy = cyRef.current;
-      if (cy && !cy.destroyed()) {
-        try {
-          cy.destroy();
-        } catch (error) {
-          console.warn('Error destroying Cytoscape instance:', error);
+      window.removeEventListener('resize', handleResize);
+      if (cyRef.current) {
+        // Clean up grid event handler if it exists
+        if ((cyRef.current as any)._gridEventHandler) {
+          cyRef.current.off('zoom pan resize', (cyRef.current as any)._gridEventHandler);
+        }
+        cyRef.current.destroy();
+        cyRef.current = null;
+      }
+      // Clean up CSS grid background
+      if (containerRef.current) {
+        const existingGrid = containerRef.current.querySelector('.css-dot-grid-bg');
+        if (existingGrid) {
+          existingGrid.remove();
         }
       }
-      setIsReady(false);
-      setupDoneRef.current = false;
     };
-  }, []);
+  }, [data, loading, onNodeSelect, onEdgeSelect]);
 
-  if (isLoading) {
+  // Handle selection changes
+  useEffect(() => {
+    if (!cyRef.current) return;
+
+    // Clear previous selection
+    cyRef.current.elements().unselect();
+
+    // Select node if provided
+    if (selectedNodeId) {
+      const node = cyRef.current.getElementById(selectedNodeId);
+      if (node.length > 0) {
+        node.select();
+      }
+    }
+
+    // Select edge if provided
+    if (selectedEdgeId) {
+      const edge = cyRef.current.getElementById(selectedEdgeId);
+      if (edge.length > 0) {
+        edge.select();
+      }
+    }
+  }, [selectedNodeId, selectedEdgeId]);
+
+  if (loading) {
     return (
-      <div className="h-full bg-white rounded-lg shadow-sm border flex items-center justify-center dark:bg-gray-800 dark:border-gray-700">
+      <div className="flex items-center justify-center w-full h-full bg-gray-50 dark:bg-gray-900">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-500 dark:text-gray-400">Loading graph...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <p className="text-gray-600 dark:text-gray-400">Loading graph...</p>
         </div>
       </div>
     );
@@ -474,15 +293,10 @@ export default function GraphVisualizer({
 
   if (error) {
     return (
-      <div className="h-full bg-white rounded-lg shadow-sm border flex items-center justify-center dark:bg-gray-800 dark:border-gray-700">
-        <div className="text-center">
-          <p className="text-red-500 mb-4">Error loading graph</p>
-          <button
-            onClick={() => refetch()}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-          >
-            Retry
-          </button>
+      <div className="flex items-center justify-center w-full h-full bg-gray-50 dark:bg-gray-900">
+        <div className="text-center text-red-600 dark:text-red-400">
+          <p className="font-semibold">Error loading graph</p>
+          <p className="text-sm mt-2">{error}</p>
         </div>
       </div>
     );
@@ -490,252 +304,36 @@ export default function GraphVisualizer({
 
   if (!data || (data.nodes.length === 0 && data.edges.length === 0)) {
     return (
-      <div className="h-full bg-white rounded-lg shadow-sm border flex items-center justify-center dark:bg-gray-800 dark:border-gray-700">
-        <div className="text-center">
-          <p className="text-gray-500 mb-2 dark:text-gray-400">No nodes yet.</p>
-          <p className="text-sm text-gray-400 dark:text-gray-500">Create one to get started!</p>
+      <div className="flex items-center justify-center w-full h-full bg-gray-50 dark:bg-gray-900">
+        <div className="text-center text-gray-500 dark:text-gray-400">
+          <p className="font-semibold">No nodes yet.</p>
+          <p className="text-sm mt-2">Create your first node to get started.</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="h-full flex flex-col bg-white rounded-lg shadow-sm border dark:bg-gray-800 dark:border-gray-700">
-      {/* Graph Controls */}
-      <div className="p-3 border-b flex items-center justify-between bg-gray-50 dark:bg-gray-900 dark:border-gray-700">
+    <div className="relative w-full h-full bg-white dark:bg-gray-950">
+      {/* Header overlay */}
+      <div className="absolute top-4 left-4 z-10 bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm rounded-lg px-4 py-2 shadow-md">
         <div className="flex items-center gap-4">
-          <h3 className="font-semibold text-gray-800 dark:text-gray-100">Knowledge Graph</h3>
-          <div className="text-xs text-gray-500 dark:text-gray-400">
+          <h2 className="font-semibold text-gray-900 dark:text-gray-100">Knowledge Graph</h2>
+          <span className="text-sm text-gray-600 dark:text-gray-400">
             {data.nodes.length} nodes • {data.edges.length} relationships
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => {
-              const cy = cyRef.current;
-              if (cy && !cy.destroyed() && isReady) {
-                try {
-                  cy.fit();
-                } catch (error) {
-                  console.warn('Failed to fit graph:', error);
-                }
-              }
-            }}
-            className="px-3 py-1 text-xs bg-white border rounded hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-100 dark:border-gray-700 dark:hover:bg-gray-700"
-            title="Fit to view"
-          >
-            Fit
-          </button>
-          <button
-            onClick={() => {
-              const cy = cyRef.current;
-              if (cy && !cy.destroyed() && isReady) {
-                try {
-                  cy.reset();
-                } catch (error) {
-                  console.warn('Failed to reset graph:', error);
-                }
-              }
-            }}
-            className="px-3 py-1 text-xs bg-white border rounded hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-100 dark:border-gray-700 dark:hover:bg-gray-700"
-            title="Reset view"
-          >
-            Reset
-          </button>
+          </span>
         </div>
       </div>
 
-      {/* Legend */}
-      <div className="px-3 py-2 border-b bg-gray-50 flex items-center gap-4 text-xs dark:bg-gray-900 dark:border-gray-700">
-        <span className="text-gray-600 font-medium dark:text-gray-300">Legend:</span>
-        {NODE_TYPES.map((t) => (
-          <div key={t} className="flex items-center gap-1">
-            <div
-              className="w-3 h-3 rounded"
-              style={{ backgroundColor: (settingsResponse?.node_colors || {})[t] || '#666' }}
-            ></div>
-            <span className="dark:text-gray-300">{t}</span>
-          </div>
-        ))}
+      {/* Grid help indicator */}
+      <div className="absolute bottom-4 left-4 z-10 bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm rounded-lg px-3 py-2 shadow-md text-xs text-gray-600 dark:text-gray-400">
+        Grid snapping enabled • Drag nodes to snap
       </div>
 
-      {/* Cytoscape Graph */}
-      <div className="flex-1 relative" style={{ backgroundColor: isDarkMode ? '#111827' : '#ffffff' }}>
-        {/* Grid layer - provided by cytoscape-grid-guide extension */}
-        <CytoscapeComponent
-          elements={elements}
-          stylesheet={stylesheet as any}
-          layout={{
-            name: 'cose',
-            animate: false, // Disable animation to prevent race conditions
-            idealEdgeLength: 100,
-            nodeRepulsion: 4500,
-            nestingFactor: 0.1,
-            gravity: 0.25,
-            numIter: 2500,
-            tile: true,
-            tilingPaddingVertical: 10,
-            tilingPaddingHorizontal: 10,
-            gravityRangeCompound: 1.5,
-            gravityCompound: 1.0,
-            gravityRange: 3.8,
-            initialEnergyOnIncremental: 0.3,
-          }}
-          style={{ width: '100%', height: '100%', position: 'relative', zIndex: 1 }}
-          cy={(cy: Core) => {
-            if (!cy) {
-              setIsReady(false);
-              setupDoneRef.current = false;
-              return;
-            }
-            
-            // Guard against destroyed instances
-            if (cy.destroyed()) {
-              setIsReady(false);
-              setupDoneRef.current = false;
-              return;
-            }
-
-            // Prevent multiple setups if already done
-            if (setupDoneRef.current && cyRef.current === cy) {
-              return;
-            }
-
-            cyRef.current = cy;
-            if (!setupDoneRef.current) {
-              setIsReady(false);
-            }
-
-            const setupCytoscape = async () => {
-              try {
-                if (cy.destroyed() || setupDoneRef.current) {
-                  return;
-                }
-
-                cy.userPanningEnabled(true);
-                cy.boxSelectionEnabled(true);
-                cy.zoomingEnabled(true);
-                cy.minZoom(0.1);
-                cy.maxZoom(2);
-
-                // Configure cytoscape-grid-guide
-                try {
-                  (cy as any).gridGuide({
-                    drawGrid: true,
-                    gridSpacing: 20,
-                    gridColor: isDarkMode ? '#374151' : '#D1D5DB',
-                    lineWidth: 1,
-                    panGrid: true,
-                    gridStackOrder: -1, // Behind nodes
-                    snapToGridOnRelease: false,
-                    snapToGridDuringDrag: false, // Visual only
-                  });
-                } catch (error) {
-                  console.warn('Failed to configure grid-guide:', error);
-                }
-
-                // Configure cytoscape-navigator
-                try {
-                  if (navigatorRef.current) {
-                    (cy as any).navigator({
-                      container: navigatorRef.current,
-                      viewLiveFramerate: 0,
-                      thumbnailEventFramerate: 30,
-                      thumbnailLiveFramerate: 30,
-                      dblClickDelay: 200,
-                      removeCustomContainer: false,
-                    });
-                  }
-                } catch (error) {
-                  console.warn('Failed to configure navigator:', error);
-                }
-
-                setupDoneRef.current = true;
-                setIsReady(true);
-              } catch (error) {
-                console.warn('Error setting up Cytoscape:', error);
-                setIsReady(false);
-                setupDoneRef.current = false;
-              }
-            };
-
-            if (!setupDoneRef.current) {
-              const readyHandler = () => {
-                if (!cy.destroyed() && cy === cyRef.current) {
-                  setIsReady(true);
-                }
-              };
-
-              cy.on('ready', readyHandler);
-              
-              try {
-                if (cy.container()) {
-                  setupCytoscape();
-                } else {
-                  setTimeout(() => {
-                    if (!cy.destroyed() && cy === cyRef.current) {
-                      setupCytoscape();
-                    }
-                  }, 150);
-                }
-              } catch {
-                setTimeout(() => {
-                  if (!cy.destroyed() && cy === cyRef.current) {
-                    setupCytoscape();
-                  }
-                }, 150);
-              }
-            }
-          }}
-        />
-
-        {/* Status Bubbles Overlay */}
-        <div
-          ref={statusBubblesRef}
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            width: '100%',
-            height: '100%',
-            pointerEvents: 'none',
-            zIndex: 2,
-          }}
-        >
-          {statusBubblePositions.map((bubble) => {
-            const color = (STATUS_COLORS as any)[bubble.status] || '#6B7280';
-            return (
-              <div
-                key={bubble.id}
-                style={{
-                  position: 'absolute',
-                  left: `${bubble.x}px`,
-                  top: `${bubble.y - 15}px`, // Position above the node
-                  transform: 'translate(-50%, -50%)',
-                  width: '12px',
-                  height: '12px',
-                  borderRadius: '50%',
-                  backgroundColor: color,
-                  border: '2px solid white',
-                  boxShadow: '0 1px 3px rgba(0, 0, 0, 0.3)',
-                }}
-                title={`${bubble.status} status`}
-              />
-            );
-          })}
-        </div>
-
-        {/* Navigator (Minimap) */}
-        <div
-          ref={navigatorRef}
-          className="absolute bottom-4 right-4 w-[150px] h-[150px] border rounded shadow-lg"
-          style={{
-            backgroundColor: isDarkMode ? '#1f2937' : '#ffffff',
-            borderColor: isDarkMode ? '#374151' : '#d1d5db',
-            zIndex: 3,
-          }}
-        />
-      </div>
+      {/* Cytoscape container */}
+      <div ref={containerRef} className="w-full h-full" />
     </div>
   );
-}
+};
+
+export default React.memo(GraphVisualizer);
