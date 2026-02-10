@@ -1,0 +1,14 @@
+# Railway/Nixpacks configuration for static React SPA
+# Uses `serve` package to serve the built static files
+
+[phases.setup]
+nixPkgs = ["nodejs_18"]
+
+[phases.install]
+cmds = ["npm ci"]
+
+[phases.build]
+cmds = ["npm run build"]
+
+[start]
+cmd = "npm start"
