@@ -1,0 +1,10 @@
+# ThoughtLab Railway Configuration
+# Deploy as a monorepo with separate services
+
+[build]
+# Railway will detect services from subdirectory configs
+
+[deploy]
+healthcheckPath = "/health"
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3

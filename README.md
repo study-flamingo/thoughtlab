@@ -292,6 +292,7 @@ docker-compose ps  # Should show "healthy"
 ### Detailed References
 
 - [SETUP.md](./docs/SETUP.md) - Detailed setup instructions
+- [RAILWAY_DEPLOYMENT.md](./docs/RAILWAY_DEPLOYMENT.md) - Deploy to Railway
 - [TESTING.md](./docs/TESTING.md) - Testing guide
 - [DEPENDENCIES.md](./docs/DEPENDENCIES.md) - Dependency management
 - [MCP_SERVER_GUIDE.md](./docs/MCP_SERVER_GUIDE.md) - MCP server setup and usage

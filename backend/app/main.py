@@ -68,7 +68,8 @@ app.add_middleware(
     # Keep explicit origins for clarity during development
     allow_origins=settings.cors_allow_origins,
     # Also allow localhost/127.0.0.1 on any port (useful when Vite picks another port)
-    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$",
+    # And Railway domains (*.up.railway.app)
+    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$|^https://[a-z0-9-]+\.up\.railway\.app$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

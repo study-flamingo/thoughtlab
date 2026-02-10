@@ -1,0 +1,9 @@
+# ThoughtLab Frontend - Railway Configuration
+
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile.railway"
+
+[deploy]
+healthcheckPath = "/health"
+numReplicas = 1

@@ -1,0 +1,13 @@
+# ThoughtLab Backend - Railway Configuration
+
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+healthcheckPath = "/health"
+healthcheckTimeout = 30
+numReplicas = 1
+startCommand = "uvicorn app.main:app --host 0.0.0.0 --port $PORT"
+
+# Railway injects PORT automatically
