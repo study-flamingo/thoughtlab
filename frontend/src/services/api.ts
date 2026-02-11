@@ -32,9 +32,8 @@ import type {
 } from '../types/tools';
 
 const api = axios.create({
-  // Use relative URL - Vite dev server proxies /api/* to backend
-  // This works in both containerized and local development
-  baseURL: '/api/v1',
+  // Use VITE_API_URL in production, relative URL for dev (Vite proxy)
+  baseURL: import.meta.env.VITE_API_URL || '/api/v1',
   headers: {
     'Content-Type': 'application/json',
   },
