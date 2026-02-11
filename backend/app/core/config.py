@@ -17,6 +17,7 @@ class Settings(BaseSettings):
 
     # Security
     secret_key: str
+    login_password: str = ""  # Password for login (empty = no auth required)
 
     # Application
     debug: bool = False

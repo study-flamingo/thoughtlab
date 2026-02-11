@@ -30,6 +30,7 @@ import type {
   MergeNodesRequest,
   MergeNodesResponse,
 } from '../types/tools';
+import { getToken, removeToken } from './auth';
 
 const api = axios.create({
   // Use VITE_API_URL in production, relative URL for dev (Vite proxy)
@@ -39,12 +40,12 @@ const api = axios.create({
   },
 });
 
-// Add request interceptor for auth (when implemented)
+// Add request interceptor for auth
 api.interceptors.request.use((config) => {
-  // const token = localStorage.getItem('token');
-  // if (token) {
-  //   config.headers.Authorization = `Bearer ${token}`;
-  // }
+  const token = getToken();
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
   return config;
 });
 
@@ -53,8 +54,9 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      // Handle unauthorized
-      console.error('Unauthorized access');
+      // Handle unauthorized - remove token and reload to trigger login
+      removeToken();
+      window.location.reload();
     }
     return Promise.reject(error);
   }

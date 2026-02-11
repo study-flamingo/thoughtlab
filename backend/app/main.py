@@ -1,14 +1,21 @@
 from contextlib import asynccontextmanager
 import logging
 import asyncio
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from app.core.config import settings
 from app.db.neo4j import neo4j_conn
 from app.db.redis import redis_conn
-from app.api.routes import nodes, graph, settings as settings_routes, activities, tools
+from app.api.routes import nodes, graph, settings as settings_routes, activities, tools, auth
+from app.api.routes.auth import verify_token, is_auth_enabled
 from app.mcp import create_mcp_server
 from typing import Callable, Awaitable
+
+
+# Protected paths that require authentication
+PROTECTED_PREFIXES = ["/api/v1/nodes", "/api/v1/graph", "/api/v1/activities", "/api/v1/tools", "/api/v1/settings"]
+EXCLUDED_PATHS = ["/api/v1/auth", "/health", "/", "/mcp"]
 
 
 @asynccontextmanager
@@ -76,6 +83,42 @@ app.add_middleware(
 )
 
 
+@app.middleware("http")
+async def auth_middleware(request: Request, call_next):
+    """Middleware to protect API routes with JWT authentication."""
+    path = request.url.path
+    
+    # Skip auth for excluded paths
+    for excluded in EXCLUDED_PATHS:
+        if path.startswith(excluded):
+            return await call_next(request)
+    
+    # Check if auth is enabled
+    if not is_auth_enabled():
+        return await call_next(request)
+    
+    # Check if path is protected
+    is_protected = any(path.startswith(prefix) for prefix in PROTECTED_PREFIXES)
+    if not is_protected:
+        return await call_next(request)
+    
+    # Verify token from Authorization header
+    auth_header = request.headers.get("Authorization", "")
+    token = None
+    
+    if auth_header.startswith("Bearer "):
+        token = auth_header[7:]  # Remove "Bearer " prefix
+    
+    if not token or not verify_token(token):
+        return JSONResponse(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            content={"detail": "Invalid or missing authentication token"},
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    return await call_next(request)
+
+
 @app.get("/")
 async def root():
     return {
@@ -91,6 +134,7 @@ app.include_router(graph.router, prefix="/api/v1")
 app.include_router(settings_routes.router, prefix="/api/v1")
 app.include_router(activities.router, prefix="/api/v1")
 app.include_router(tools.router, prefix="/api/v1")
+app.include_router(auth.router, prefix="/api/v1")
 
 # Mount MCP server at /mcp for Streamable HTTP access
 try:
