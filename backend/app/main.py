@@ -29,8 +29,8 @@ async def lifespan(app: FastAPI):
         if last_exc:
             raise last_exc
 
-    # Connect to Neo4j (required)
-    await _retry(neo4j_conn.connect, "neo4j")
+    # Connect to Neo4j (required) - give it time on cold starts
+    await _retry(neo4j_conn.connect, "neo4j", attempts=15, delay_s=2)
 
     # Connect to Redis (optional - for caching)
     try:
