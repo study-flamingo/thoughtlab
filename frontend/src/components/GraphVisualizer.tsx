@@ -145,7 +145,7 @@ const GraphVisualizer: React.FC<GraphVisualizerProps> = ({
     // Set better default zoom after layout completes
     cy.one('layoutstop', () => {
       // Fit the graph with some padding, then zoom out a bit for better overview
-      cy.fit(50); // Fit with 50px padding
+      cy.fit(undefined, 50); // Fit with 50px padding
       const currentZoom = cy.zoom();
       const betterZoom = currentZoom * 0.7; // Zoom out to 70% of fitted zoom
       cy.zoom(betterZoom);
