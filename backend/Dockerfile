@@ -16,6 +16,7 @@ RUN pip install uv
 COPY pyproject.toml ./
 
 # Install dependencies using uv
+# Cache bust: 2026-02-11-auth-deps
 RUN uv pip install --system -e .
 
 # Copy application code
