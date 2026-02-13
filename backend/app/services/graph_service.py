@@ -845,7 +845,7 @@ class GraphService:
                     "id": record["id"],
                     "from_id": record["from_id"],
                     "to_id": record["to_id"],
-                    "relationship_type": record["type"],
+                    "type": record["type"],
                 }
                 props = dict(record.get("props", {}))
                 # Include all relationship properties
