@@ -136,13 +136,13 @@ app.include_router(activities.router, prefix="/api/v1")
 app.include_router(tools.router, prefix="/api/v1")
 app.include_router(auth.router, prefix="/api/v1")
 
-# Mount MCP server at /mcp for Streamable HTTP access
-try:
-    mcp_server = create_mcp_server()
-    app.mount("/mcp", mcp_server.http_app())
-    logging.info("MCP server mounted at /mcp")
-except Exception as e:
-    logging.warning(f"Failed to mount MCP server: {e}")
+# MCP server disabled - ThoughtLab is not an MCP server
+# try:
+#     mcp_server = create_mcp_server()
+#     app.mount("/mcp", mcp_server.http_app())
+#     logging.info("MCP server mounted at /mcp")
+# except Exception as e:
+#     logging.warning(f"Failed to mount MCP server: {e}")
 
 
 @app.get("/health")

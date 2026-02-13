@@ -51,6 +51,8 @@ services:
     restart: unless-stopped
     ports:
       - "8000:8000"
+    volumes:
+      - ./backend:/app
     environment:
       # Database connections (use container names for networking)
       NEO4J_URI: bolt://neo4j:7687
@@ -75,6 +77,7 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/docs"]
       interval: 30s
