@@ -239,6 +239,15 @@ export const graphApi = {
 
   reclassifyRelationship: (edgeId: string, data: ReclassifyRelationshipRequest = {}) =>
     api.post<ReclassifyRelationshipResponse>(`/tools/relationships/${edgeId}/reclassify`, data),
+
+  // === AI Chat ===
+
+  sendChatMessage: (message: string, context?: { currentNodeId?: string; currentEdgeId?: string }) =>
+    api.post<{ response: string; session_id: string; actions: any[] }>('/chat', {
+      message,
+      current_node_id: context?.currentNodeId,
+      current_edge_id: context?.currentEdgeId,
+    }),
 };
 
 export default api;
