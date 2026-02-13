@@ -23,6 +23,7 @@ const GraphVisualizer: React.FC<GraphVisualizerProps> = ({
   const [zoomLevel, setZoomLevel] = React.useState(1);
 
   // Fetch graph data using React Query - auto-refreshes when other components invalidate ['graph']
+  // Also polls every 5 seconds to catch changes from AI chat or other users
   const {
     data,
     isLoading: loading,
@@ -34,6 +35,8 @@ const GraphVisualizer: React.FC<GraphVisualizerProps> = ({
       const response = await graphApi.getFullGraph();
       return response.data;
     },
+    refetchInterval: 5000, // Poll every 5 seconds
+    refetchIntervalInBackground: false, // Don't poll when tab is hidden
   });
 
   // Light theme node colors (more saturated, visible on white)
