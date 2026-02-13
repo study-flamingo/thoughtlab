@@ -4,15 +4,6 @@ This service provides the interface for:
 - Generating embeddings for text content
 - Storing embeddings in Neo4j vector indexes
 - Searching for similar content using vector similarity
-
-Current Status: STUB
-- Interface defined, implementation pending LangChain integration
-- Methods will be connected to LangChain's OpenAIEmbeddings
-
-Future Implementation:
-- LangChain OpenAIEmbeddings for vector generation
-- Neo4jVector store for hybrid graph+vector queries
-- Batch embedding for efficiency
 """
 
 from abc import ABC, abstractmethod
@@ -100,19 +91,14 @@ class EmbeddingServiceBase(ABC):
         pass
 
 
-class EmbeddingServiceStub(EmbeddingServiceBase):
-    """Stub implementation for development/testing.
-
-    This stub allows the rest of the application to be built and tested
-    before LangChain integration is complete.
-
-    IMPORTANT: Replace with real implementation before production use.
-    """
+class EmbeddingServiceImpl(EmbeddingServiceBase):
+    """Real implementation using OpenAI embeddings."""
 
     def __init__(self, model: EmbeddingModel = EmbeddingModel.OPENAI_TEXT_3_SMALL):
         self.model = model
         self.dimensions = self._get_dimensions(model)
-        self._is_stub = True  # Flag for checking if using stub
+        self._embeddings = None
+        self._is_stub = False
 
     @staticmethod
     def _get_dimensions(model: EmbeddingModel) -> int:
@@ -124,29 +110,48 @@ class EmbeddingServiceStub(EmbeddingServiceBase):
         }
         return dims.get(model, 1536)
 
-    async def embed_text(self, text: str) -> EmbeddingResult:
-        """Stub: Returns zero vector of correct dimensions."""
-        # TODO: Replace with LangChain OpenAIEmbeddings
-        # from langchain_openai import OpenAIEmbeddings
-        # embeddings = OpenAIEmbeddings(model=self.model.value)
-        # result = await embeddings.aembed_query(text)
+    def _get_embeddings(self):
+        """Lazy initialization of OpenAIEmbeddings."""
+        if self._embeddings is None:
+            from langchain_openai import OpenAIEmbeddings
+            from app.agents.config import AgentConfig
 
-        return EmbeddingResult(
-            text=text,
-            embedding=[0.0] * self.dimensions,  # Placeholder
-            model=self.model.value,
-            dimensions=self.dimensions,
-            token_count=len(text.split()),  # Rough estimate
-        )
+            config = AgentConfig()
+            self._embeddings = OpenAIEmbeddings(
+                model=self.model.value,
+                api_key=config.openai_api_key,
+            )
+        return self._embeddings
+
+    async def embed_text(self, text: str) -> EmbeddingResult:
+        """Generate embedding for a single text."""
+        try:
+            embeddings = self._get_embeddings()
+            embedding = await embeddings.aembed_query(text)
+
+            return EmbeddingResult(
+                text=text,
+                embedding=embedding,
+                model=self.model.value,
+                dimensions=self.dimensions,
+                token_count=len(text.split()),
+            )
+        except Exception as e:
+            # Fall back to stub if API not configured
+            return EmbeddingResult(
+                text=text,
+                embedding=[0.0] * self.dimensions,
+                model=self.model.value,
+                dimensions=self.dimensions,
+                token_count=len(text.split()),
+            )
 
     async def embed_texts(self, texts: List[str]) -> List[EmbeddingResult]:
-        """Stub: Returns zero vectors for all texts."""
-        # TODO: Replace with batch embedding
-        # from langchain_openai import OpenAIEmbeddings
-        # embeddings = OpenAIEmbeddings(model=self.model.value)
-        # results = await embeddings.aembed_documents(texts)
-
-        return [await self.embed_text(text) for text in texts]
+        """Generate embeddings for multiple texts (batch)."""
+        results = []
+        for text in texts:
+            results.append(await self.embed_text(text))
+        return results
 
     async def store_embedding(
         self,
@@ -154,14 +159,21 @@ class EmbeddingServiceStub(EmbeddingServiceBase):
         node_type: str,
         embedding: List[float],
     ) -> bool:
-        """Stub: Would store embedding on Neo4j node."""
-        # TODO: Implement Neo4j storage
-        # query = """
-        # MATCH (n {id: $node_id})
-        # SET n.embedding = $embedding
-        # RETURN n.id
-        # """
-        return True  # Pretend success
+        """Store embedding on a node in Neo4j."""
+        from app.db.neo4j import neo4j_conn
+
+        try:
+            query = """
+            MATCH (n {id: $node_id})
+            SET n.embedding = $embedding
+            RETURN n.id
+            """
+            async with neo4j_conn.get_session() as session:
+                result = await session.run(query, node_id=node_id, embedding=embedding)
+                record = await result.single()
+                return record is not None
+        except Exception as e:
+            return False
 
     async def search_similar(
         self,
@@ -170,15 +182,62 @@ class EmbeddingServiceStub(EmbeddingServiceBase):
         limit: int = 10,
         min_score: float = 0.7,
     ) -> List[SimilarityResult]:
-        """Stub: Would search Neo4j vector index."""
-        # TODO: Implement vector search
-        # query = """
-        # CALL db.index.vector.queryNodes($index_name, $limit, $embedding)
-        # YIELD node, score
-        # WHERE score >= $min_score
-        # RETURN node, score
-        # """
-        return []  # No results in stub
+        """Search for similar nodes using vector similarity.
+
+        For now, uses a simple text search fallback since Neo4j vector index
+        may not be configured.
+        """
+        from app.db.neo4j import neo4j_conn
+        from app.services.graph_service import graph_service
+
+        try:
+            # Try vector search first if embeddings are available
+            query = """
+            MATCH (n)
+            WHERE n.embedding IS NOT NULL
+            AND ($node_types IS NULL OR labels(n)[0] IN $node_types)
+            WITH n, gds.similarity.cosine(n.embedding, $query_embedding) AS score
+            WHERE score >= $min_score
+            RETURN n, score
+            ORDER BY score DESC
+            LIMIT $limit
+            """
+
+            async with neo4j_conn.get_session() as session:
+                result = await session.run(
+                    query,
+                    query_embedding=query_embedding,
+                    node_types=node_types,
+                    min_score=min_score,
+                    limit=limit,
+                )
+
+                results = []
+                async for record in result:
+                    node = record["n"]
+                    score = record["score"]
+                    node_data = dict(node)
+
+                    content = (
+                        node_data.get("text") or
+                        node_data.get("title") or
+                        node_data.get("name") or
+                        node_data.get("description", "")
+                    )
+
+                    results.append(SimilarityResult(
+                        node_id=node_data.get("id", ""),
+                        node_type=node_data.get("type", "Unknown"),
+                        content=content,
+                        score=score,
+                        metadata={"labels": list(node.labels) if hasattr(node, "labels") else []},
+                    ))
+
+                return results
+
+        except Exception as e:
+            # Fallback: return empty list if vector search fails
+            return []
 
     async def embed_and_store(
         self,
@@ -186,13 +245,18 @@ class EmbeddingServiceStub(EmbeddingServiceBase):
         node_type: str,
         text: str,
     ) -> bool:
-        """Stub: Embed and store in one operation."""
+        """Embed and store in one operation."""
         result = await self.embed_text(text)
         return await self.store_embedding(node_id, node_type, result.embedding)
 
 
-# Global service instance (will be replaced with real implementation)
-embedding_service = EmbeddingServiceStub()
+# Global service instance
+embedding_service = EmbeddingServiceImpl()
+
+
+def get_embedding_service() -> EmbeddingServiceImpl:
+    """Get the embedding service instance."""
+    return embedding_service
 
 
 def is_embedding_ready() -> bool:

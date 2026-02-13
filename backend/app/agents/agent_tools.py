@@ -21,6 +21,10 @@ from langchain_core.tools import tool
 from app.tools import get_tool_registry
 from app.services.tools import get_tool_service
 from app.services.report_service import get_report_service
+from app.services.web_fetcher import fetch_url
+from app.services.graph_service import graph_service
+from app.services.embedding_service import get_embedding_service
+from app.models.nodes import SourceCreate
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +46,9 @@ def get_agent_tools() -> List:
         summarize_relationship,
         recalculate_edge_confidence,
         reclassify_relationship,
+        create_node_from_url,
+        semantic_search_nodes,
+        create_relationship_with_ai,
     ]
 
 
@@ -722,6 +729,301 @@ def _format_reclassify_relationship_result(result, edge_id: str) -> str:
         output.append(f"\nReasoning: {result.reasoning}")
 
     return "".join(output)
+
+
+# ============================================================================
+# Node Creation & Relationship Tools
+# ============================================================================
+
+@tool
+async def create_node_from_url(
+    url: str,
+    node_type: str = "Source",
+    auto_link: bool = True,
+    min_similarity: float = 0.6,
+) -> str:
+    """Create a new node by fetching and parsing content from a URL.
+
+    This tool fetches a web page, extracts its title and content, creates a new
+    node in the knowledge graph, and optionally links it to related existing nodes.
+
+    Use this when the user wants to:
+    - Add a source from a web page
+    - Create a node from online content
+    - Import external research into the knowledge graph
+
+    Args:
+        url: The URL to fetch and parse
+        node_type: Type of node to create (default: "Source")
+        auto_link: If True, automatically find and create relationships to similar nodes (default: True)
+        min_similarity: Minimum similarity score for auto-linking (0.0-1.0, default: 0.6)
+
+    Returns:
+        A formatted report of the created node and any relationships established
+    """
+    from app.agents.config import AgentConfig
+
+    config = AgentConfig()
+
+    # Step 1: Fetch the URL
+    logger.info(f"Fetching URL for node creation: {url}")
+    fetch_result = await fetch_url(url)
+
+    if not fetch_result.get("success"):
+        return f"Failed to fetch URL: {fetch_result.get('error', 'Unknown error')}"
+
+    title = fetch_result.get("title", "Untitled")
+    content = fetch_result.get("content", "")
+    summary = fetch_result.get("summary", "")
+
+    # Step 2: Create the node
+    try:
+        if node_type == "Source":
+            node_data = SourceCreate(
+                title=title,
+                url=url,
+                source_type="article",
+                content=content[:5000],  # Limit content length
+            )
+            node_id = await graph_service.create_source(node_data)
+        else:
+            # For other node types, create as generic Entity
+            from app.models.nodes import EntityCreate
+            node_data = EntityCreate(
+                name=title,
+                entity_type="web_content",
+                description=summary or content[:1000],
+                properties={"url": url, "full_content": content[:5000]},
+            )
+            node_id = await graph_service.create_entity(node_data)
+
+        logger.info(f"Created {node_type} node: {node_id}")
+
+    except Exception as e:
+        logger.error(f"Failed to create node: {e}")
+        return f"Failed to create node: {e}"
+
+    # Step 3: Auto-link to related nodes if requested
+    links_created = []
+    if auto_link:
+        try:
+            tool_service = get_tool_service()
+            similar_result = await tool_service.find_related_nodes(
+                node_id=node_id,
+                limit=10,
+                min_similarity=min_similarity,
+                auto_link=True,  # Let the tool handle relationship creation
+            )
+
+            if similar_result.success and similar_result.links_created:
+                links_created = similar_result.links_created
+
+        except Exception as e:
+            logger.warning(f"Auto-linking failed: {e}")
+
+    # Format output
+    output = [
+        f"Created {node_type} node from URL:\n",
+        f"Node ID: {node_id}\n",
+        f"Title: {title}\n",
+        f"URL: {url}\n",
+        f"Content length: {len(content)} characters\n",
+    ]
+
+    if summary:
+        output.append(f"Summary: {summary[:200]}...\n")
+
+    if links_created:
+        output.append(f"\nAuto-linked to {len(links_created)} related nodes:\n")
+        for link in links_created:
+            output.append(f"  - {link['node_id']}: {link['type']} (similarity: {link['similarity']:.2f})\n")
+    elif auto_link:
+        output.append("\nNo sufficiently similar nodes found for auto-linking.\n")
+
+    return "".join(output)
+
+
+@tool
+async def semantic_search_nodes(
+    query: str,
+    limit: int = 10,
+    min_similarity: float = 0.5,
+    node_types: Optional[List[str]] = None,
+) -> str:
+    """Search for nodes using semantic similarity to a natural language query.
+
+    Use this tool to:
+    - Find nodes related to a topic or concept
+    - Discover relevant research for a query
+    - Identify potential connections before creating new nodes
+
+    Args:
+        query: Natural language search query
+        limit: Maximum number of results (1-50, default 10)
+        min_similarity: Minimum similarity score 0.0-1.0 (default 0.5)
+        node_types: Optional list of node types to filter (e.g., ["Observation", "Source"])
+
+    Returns:
+        A formatted list of semantically similar nodes
+    """
+    try:
+        embedding_service = get_embedding_service()
+
+        # Generate embedding for the query
+        embed_result = await embedding_service.embed_text(query)
+        query_embedding = embed_result.embedding
+
+        # Search for similar nodes
+        similar_nodes = await embedding_service.search_similar(
+            query_embedding=query_embedding,
+            limit=limit,
+            min_score=min_similarity,
+            node_types=node_types,
+        )
+
+        if not similar_nodes:
+            return f"No nodes found matching query: '{query}' (min similarity: {min_similarity})"
+
+        output = [f"Found {len(similar_nodes)} nodes matching '{query}':\n"]
+
+        for i, node in enumerate(similar_nodes, 1):
+            content_preview = node.content[:100] + "..." if len(node.content) > 100 else node.content
+            output.append(f"\n{i}. [{node.node_type}] {node.node_id}")
+            output.append(f"   Similarity: {node.score:.2f}")
+            if content_preview:
+                output.append(f"   Preview: {content_preview}")
+
+        return "\n".join(output)
+
+    except Exception as e:
+        logger.error(f"Semantic search failed: {e}")
+        return f"Error performing semantic search: {e}"
+
+
+@tool
+async def create_relationship_with_ai(
+    from_id: str,
+    to_id: str,
+    context: str = "",
+    confidence: float = 0.8,
+) -> str:
+    """Create a relationship between two nodes with AI-detected relationship type.
+
+    This tool analyzes both nodes and their content to determine the most
+    appropriate relationship type, then creates the relationship.
+
+    Use this when:
+    - Creating relationships between newly created nodes and existing ones
+    - You want AI to determine the relationship type automatically
+    - The relationship semantics are unclear
+
+    Args:
+        from_id: ID of the source node
+        to_id: ID of the target node
+        context: Optional context to help determine relationship type
+        confidence: Confidence score for the relationship (0.0-1.0, default 0.8)
+
+    Returns:
+        A formatted report of the created relationship
+    """
+    tool_service = get_tool_service()
+
+    try:
+        # Use the classifier to determine relationship type
+        from_node = await graph_service.get_node(from_id)
+        to_node = await graph_service.get_node(to_id)
+
+        if not from_node or not to_node:
+            return f"Failed to create relationship: one or both nodes not found ({from_id}, {to_id})"
+
+        # Extract content for classification
+        from_content = (
+            from_node.get("text") or
+            from_node.get("title") or
+            from_node.get("name") or
+            from_node.get("description", "")
+        )
+        to_content = (
+            to_node.get("text") or
+            to_node.get("title") or
+            to_node.get("name") or
+            to_node.get("description", "")
+        )
+
+        # Use LLM to classify relationship
+        from app.agents.config import AgentConfig
+        from langchain_openai import ChatOpenAI
+
+        config = AgentConfig()
+        llm = ChatOpenAI(
+            model=config.model_name,
+            temperature=0.3,
+            api_key=config.openai_api_key,
+        )
+
+        prompt = f"""Analyze these two nodes and determine the best relationship type:
+
+Node A ({from_node.get('type', 'Unknown')}): {from_content[:500]}
+
+Node B ({to_node.get('type', 'Unknown')}): {to_content[:500]}
+
+Context: {context}
+
+Choose ONE relationship type from:
+- SUPPORTS: A provides evidence for B
+- CONTRADICTS: A provides evidence against B
+- RELATES_TO: A is related to B (general connection)
+- CITES: A references/cites B
+- DERIVED_FROM: A is derived from B
+- INSPIRED_BY: A was inspired by B
+- PRECEDES: A comes before B (temporal)
+- CAUSES: A causes or leads to B
+- PART_OF: A is part of B
+- SIMILAR_TO: A is similar to B
+- OBSERVED_IN: A was observed in B
+- DISCUSSES: A discusses B
+
+Respond with ONLY the relationship type (e.g., "SUPPORTS")."""
+
+        response = await llm.ainvoke(prompt)
+        rel_type = response.content.strip().upper()
+
+        # Validate the type
+        valid_types = ["SUPPORTS", "CONTRADICTS", "RELATES_TO", "CITES", "DERIVED_FROM",
+                      "INSPIRED_BY", "PRECEDES", "CAUSES", "PART_OF", "SIMILAR_TO",
+                      "OBSERVED_IN", "DISCUSSES"]
+
+        if rel_type not in valid_types:
+            rel_type = "RELATES_TO"  # Default fallback
+
+        # Create the relationship
+        from app.models.nodes import normalize_relationship_type
+
+        rel_result = await graph_service.create_relationship(
+            from_id=from_id,
+            to_id=to_id,
+            rel_type=normalize_relationship_type(rel_type),
+            properties={
+                "confidence": confidence,
+                "notes": f"AI-detected relationship based on semantic analysis. Context: {context}" if context else "AI-detected relationship based on semantic analysis.",
+                "created_by": "ai-assistant",
+            }
+        )
+
+        if not rel_result:
+            return f"Failed to create relationship from {from_id} to {to_id}. Check that both nodes exist."
+
+        return (
+            f"Created relationship:\n"
+            f"From: {from_id}\n"
+            f"To: {to_id}\n"
+            f"Type: {rel_type}\n"
+            f"Confidence: {confidence}\n"
+        )
+
+    except Exception as e:
+        logger.error(f"Failed to create relationship: {e}")
+        return f"Error creating relationship: {e}"
 
 
 # Legacy alias for backwards compatibility
