@@ -59,7 +59,7 @@ const GraphVisualizer: React.FC<GraphVisualizerProps> = ({
         ...data.nodes.map((node) => ({
           data: {
             id: node.id,
-            label: node.text,
+            label: node.text || node.title || node.name || 'Untitled',
             type: node.type,
             confidence: node.confidence,
           },
@@ -98,11 +98,13 @@ const GraphVisualizer: React.FC<GraphVisualizerProps> = ({
             'curve-style': 'bezier',
             'label': 'data(label)',
             'font-size': 10,
-            'color': '#374151', // gray-700 for light theme
+            'color': '#6B7280', // gray-500 for subtle labels
             'text-rotation': 'autorotate',
-            'text-background-opacity': 1,
-            'text-background-color': '#F9FAFB', // gray-50 for light theme
-            'text-background-padding': '2px',
+            'text-background-opacity': 0, // transparent background
+            'text-margin-y': -12, // offset above the edge
+            'text-outline-width': 3,
+            'text-outline-color': '#FFFFFF', // halo for readability
+            'text-outline-opacity': 0.9,
           },
         },
         {
