@@ -83,8 +83,6 @@ const GraphVisualizer: React.FC<GraphVisualizerProps> = ({
             'color': '#fff',
             'text-valign': 'center',
             'text-halign': 'center',
-            'text-outline-width': 2,
-            'text-outline-color': '#000',
             'width': 40,
             'height': 40,
             'font-size': 10,
