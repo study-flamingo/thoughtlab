@@ -136,7 +136,7 @@ const GraphVisualizer: React.FC<GraphVisualizerProps> = ({
         animationDuration: 500,
         padding: 50,
       },
-      wheelSensitivity: 0.1, // Reduced from 0.2 for finer zoom control
+      wheelSensitivity: 0.5, // ~10% zoom per wheel increment
     });
 
     // Store reference
@@ -146,8 +146,9 @@ const GraphVisualizer: React.FC<GraphVisualizerProps> = ({
     cy.one('layoutstop', () => {
       // Fit the graph with some padding, then zoom out a bit for better overview
       cy.fit(undefined, 50); // Fit with 50px padding
-      const currentZoom = cy.zoom();
-      const betterZoom = currentZoom * 0.7; // Zoom out to 70% of fitted zoom
+      let currentZoom = cy.zoom();
+      // Cap max zoom at 200% for small graphs, apply 70% reduction otherwise
+      const betterZoom = Math.min(currentZoom * 0.7, 2.0);
       cy.zoom(betterZoom);
       cy.center();
       setZoomLevel(betterZoom);
