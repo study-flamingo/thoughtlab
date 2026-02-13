@@ -184,59 +184,65 @@ class EmbeddingServiceImpl(EmbeddingServiceBase):
     ) -> List[SimilarityResult]:
         """Search for similar nodes using vector similarity.
 
-        For now, uses a simple text search fallback since Neo4j vector index
-        may not be configured.
+        Uses simple cosine similarity calculation in Python since Neo4j GDS
+        may not be available. Loads all nodes with embeddings and calculates
+        similarity locally.
         """
         from app.db.neo4j import neo4j_conn
-        from app.services.graph_service import graph_service
+        import math
 
         try:
-            # Try vector search first if embeddings are available
+            # Fetch all nodes with embeddings
             query = """
             MATCH (n)
             WHERE n.embedding IS NOT NULL
             AND ($node_types IS NULL OR labels(n)[0] IN $node_types)
-            WITH n, gds.similarity.cosine(n.embedding, $query_embedding) AS score
-            WHERE score >= $min_score
-            RETURN n, score
-            ORDER BY score DESC
-            LIMIT $limit
+            RETURN n.id as id, labels(n)[0] as node_type, n.text as text,
+                   n.title as title, n.name as name, n.description as description,
+                   n.embedding as embedding
             """
 
             async with neo4j_conn.get_session() as session:
-                result = await session.run(
-                    query,
-                    query_embedding=query_embedding,
-                    node_types=node_types,
-                    min_score=min_score,
-                    limit=limit,
-                )
+                result = await session.run(query, node_types=node_types)
+
+                # Calculate cosine similarity for each node
+                def cosine_similarity(a, b):
+                    dot = sum(x * y for x, y in zip(a, b))
+                    norm_a = math.sqrt(sum(x * x for x in a))
+                    norm_b = math.sqrt(sum(x * x for x in b))
+                    if norm_a == 0 or norm_b == 0:
+                        return 0.0
+                    return dot / (norm_a * norm_b)
 
                 results = []
                 async for record in result:
-                    node = record["n"]
-                    score = record["score"]
-                    node_data = dict(node)
+                    embedding = record.get("embedding")
+                    if not embedding or len(embedding) != len(query_embedding):
+                        continue
 
-                    content = (
-                        node_data.get("text") or
-                        node_data.get("title") or
-                        node_data.get("name") or
-                        node_data.get("description", "")
-                    )
+                    score = cosine_similarity(query_embedding, embedding)
+                    if score >= min_score:
+                        content = (
+                            record.get("text") or
+                            record.get("title") or
+                            record.get("name") or
+                            record.get("description", "")
+                        )
 
-                    results.append(SimilarityResult(
-                        node_id=node_data.get("id", ""),
-                        node_type=node_data.get("type", "Unknown"),
-                        content=content,
-                        score=score,
-                        metadata={"labels": list(node.labels) if hasattr(node, "labels") else []},
-                    ))
+                        results.append(SimilarityResult(
+                            node_id=record.get("id", ""),
+                            node_type=record.get("node_type", "Unknown"),
+                            content=content,
+                            score=score,
+                            metadata={},
+                        ))
 
-                return results
+                # Sort by score and return top results
+                results.sort(key=lambda x: x.score, reverse=True)
+                return results[:limit]
 
         except Exception as e:
-            # Fallback: return empty list if vector search fails
+            # Fallback: return empty list if search fails
             return []
 
     async def embed_and_store(
