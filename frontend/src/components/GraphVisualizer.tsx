@@ -98,13 +98,11 @@ const GraphVisualizer: React.FC<GraphVisualizerProps> = ({
             'curve-style': 'bezier',
             'label': 'data(label)',
             'font-size': 10,
-            'color': '#6B7280', // gray-500 for subtle labels
+            'color': '#9CA3AF', // gray-400 for subtle labels on dark bg
             'text-rotation': 'autorotate',
             'text-background-opacity': 0, // transparent background
             'text-margin-y': -12, // offset above the edge
-            'text-outline-width': 3,
-            'text-outline-color': '#FFFFFF', // halo for readability
-            'text-outline-opacity': 0.9,
+            'text-outline-width': 0, // no outline
           },
         },
         {
