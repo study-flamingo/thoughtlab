@@ -134,7 +134,7 @@ async def create_relationship(data: RelationshipCreate):
             "confidence": data.confidence,
             "notes": data.notes,
             # Inverse metadata stored on the relationship for reference
-            "inverse_relationship_type": data.inverse_relationship_type.value if data.inverse_relationship_type else None,
+            "inverse_relationship_type": data.inverse_relationship_type if data.inverse_relationship_type else None,
             "inverse_confidence": data.inverse_confidence,
             "inverse_notes": data.inverse_notes,
         }
@@ -165,9 +165,9 @@ async def update_relationship(relationship_id: str, data: RelationshipUpdate):
     if data.notes is not None:
         update_props["notes"] = data.notes
     if data.relationship_type is not None:
-        update_props["relationship_type"] = data.relationship_type.value
+        update_props["relationship_type"] = data.relationship_type
     if data.inverse_relationship_type is not None:
-        update_props["inverse_relationship_type"] = data.inverse_relationship_type.value
+        update_props["inverse_relationship_type"] = data.inverse_relationship_type
     if data.inverse_confidence is not None:
         update_props["inverse_confidence"] = data.inverse_confidence
     if data.inverse_notes is not None:
