@@ -4,7 +4,7 @@ from app.services.activity_service import activity_service, ActivityService
 from app.services.embedding_service import (
     embedding_service,
     EmbeddingServiceBase,
-    EmbeddingServiceStub,
+    EmbeddingServiceImpl,
     EmbeddingModel,
     EmbeddingResult,
     SimilarityResult,
@@ -29,7 +29,7 @@ __all__ = [
     # Embedding service
     "embedding_service",
     "EmbeddingServiceBase",
-    "EmbeddingServiceStub",
+    "EmbeddingServiceImpl",
     "EmbeddingModel",
     "EmbeddingResult",
     "SimilarityResult",
