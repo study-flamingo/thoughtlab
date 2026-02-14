@@ -210,6 +210,7 @@ class GraphService:
             url: $url,
             source_type: $source_type,
             content: $content,
+            notes: $notes,
             published_date: $published_date,
             created_at: datetime($created_at),
             links: $links
@@ -233,6 +234,7 @@ class GraphService:
                 url=data.url,
                 source_type=data.source_type,
                 content=data.content,
+                notes=data.notes,
                 published_date=published_date,
                 created_at={
                     "year": now.year,
@@ -266,6 +268,9 @@ class GraphService:
         if data.content is not None:
             updates.append("s.content = $content")
             params["content"] = data.content
+        if data.notes is not None:
+            updates.append("s.notes = $notes")
+            params["notes"] = data.notes
         if data.published_date is not None:
             updates.append("s.published_date = datetime($published_date)")
             params["published_date"] = {

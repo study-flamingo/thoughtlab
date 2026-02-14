@@ -84,6 +84,11 @@ class SourceCreate(BaseModel):
     url: Optional[str] = None  # Primary URL for the source
     source_type: str = Field(default="paper")  # paper, forum, article, etc.
     content: Optional[str] = None
+    notes: Optional[str] = Field(
+        default=None,
+        max_length=10000,
+        description="Notes about this source - summaries, stories, additional context"
+    )
     published_date: Optional[datetime] = None
     links: Optional[List[LinkItem]] = None  # Additional related links
 
@@ -93,6 +98,11 @@ class SourceUpdate(BaseModel):
     url: Optional[str] = None
     source_type: Optional[str] = None
     content: Optional[str] = None
+    notes: Optional[str] = Field(
+        default=None,
+        max_length=10000,
+        description="Notes about this source - summaries, stories, additional context"
+    )
     published_date: Optional[datetime] = None
     links: Optional[List[LinkItem]] = None
 
@@ -102,6 +112,11 @@ class SourceResponse(NodeBase):
     url: Optional[str] = None
     source_type: str
     content: Optional[str] = None
+    notes: Optional[str] = Field(
+        default=None,
+        max_length=10000,
+        description="Notes about this source - summaries, stories, additional context"
+    )
     published_date: Optional[datetime] = None
     type: str = "Source"
 

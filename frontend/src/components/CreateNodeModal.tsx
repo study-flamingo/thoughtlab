@@ -16,6 +16,7 @@ export default function CreateNodeModal({ onClose }: Props) {
   const [title, setTitle] = useState('');
   const [url, setUrl] = useState('');
   const [sourceType, setSourceType] = useState('paper');
+  const [sourceNotes, setSourceNotes] = useState('');
   // Entity fields
   const [entityName, setEntityName] = useState('');
   const [entityDescription, setEntityDescription] = useState('');
@@ -48,8 +49,8 @@ export default function CreateNodeModal({ onClose }: Props) {
   });
 
   const createSourceMutation = useMutation({
-    mutationFn: (payload: { title: string; url?: string; source_type?: string }) =>
-      graphApi.createSource({ title: payload.title, url: payload.url, source_type: payload.source_type }),
+    mutationFn: (payload: { title: string; url?: string; source_type?: string; notes?: string }) =>
+      graphApi.createSource({ title: payload.title, url: payload.url, source_type: payload.source_type, notes: payload.notes }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['graph'] });
       onClose();
@@ -88,6 +89,7 @@ export default function CreateNodeModal({ onClose }: Props) {
         title,
         url: url || undefined,
         source_type: sourceType || undefined,
+        notes: sourceNotes || undefined,
       });
     } else if (nodeType === 'hypothesis') {
       createHypothesisMutation.mutate({
@@ -217,6 +219,17 @@ export default function CreateNodeModal({ onClose }: Props) {
                     <option key={type} value={type} />
                   ))}
                 </datalist>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Notes
+                </label>
+                <textarea
+                  value={sourceNotes}
+                  onChange={(e) => setSourceNotes(e.target.value)}
+                  className="w-full border dark:border-gray-600 rounded-md px-3 py-2 h-32 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Notes about this source..."
+                />
               </div>
             </>
           )}

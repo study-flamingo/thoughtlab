@@ -62,6 +62,7 @@ export default function NodeInspector({ nodeId, onClose }: Props) {
         title: node.title || '',
         url: (node as any).url || '',
         source_type: (node as any).source_type || 'paper',
+        notes: (node as any).notes || '',
         // Entity fields
         name: node.name || '',
         description: node.description || '',
@@ -109,7 +110,7 @@ export default function NodeInspector({ nodeId, onClose }: Props) {
   });
 
   const updateSourceMutation = useMutation({
-    mutationFn: (data: { title?: string; url?: string; source_type?: string; links?: LinkItem[] }) =>
+    mutationFn: (data: { title?: string; url?: string; source_type?: string; notes?: string; links?: LinkItem[] }) =>
       graphApi.updateSource(nodeId!, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['node', nodeId] });
@@ -287,6 +288,7 @@ export default function NodeInspector({ nodeId, onClose }: Props) {
           title: formData.title,
           url: formData.url || undefined,
           source_type: formData.source_type,
+          notes: formData.notes || undefined,
           links: validLinks,
         });
         break;
@@ -568,6 +570,22 @@ export default function NodeInspector({ nodeId, onClose }: Props) {
                 <p className="text-sm text-gray-700 dark:text-gray-300">{(node as any).source_type || 'paper'}</p>
               )}
             </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Notes
+              </label>
+              {isEditing ? (
+                <textarea
+                  value={formData.notes}
+                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                  className="w-full border dark:border-gray-600 rounded-md px-3 py-2 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  rows={4}
+                  placeholder="Notes about this source..."
+                />
+              ) : (
+                <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{(node as any).notes || '-'}</p>
+              )}
+            </div>
           </>
         )}
 
@@ -831,6 +849,7 @@ export default function NodeInspector({ nodeId, onClose }: Props) {
                     title: node.title || '',
                     url: (node as any).url || '',
                     source_type: (node as any).source_type || 'paper',
+                    notes: (node as any).notes || '',
                     name: node.name || '',
                     description: node.description || '',
                     entity_type: (node as any).entity_type || 'generic',
