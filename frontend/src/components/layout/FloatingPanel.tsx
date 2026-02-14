@@ -121,7 +121,7 @@ export default function FloatingPanel({
         style={{ zIndex }}
         role="dialog"
         aria-modal="true"
-        aria-label={title || 'Panel'}
+        aria-label={typeof title === 'string' ? title : 'Panel'}
       >
         {/* Header */}
         {(title || showCloseButton) && (

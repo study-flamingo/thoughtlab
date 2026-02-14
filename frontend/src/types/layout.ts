@@ -19,7 +19,7 @@ export interface FloatingPanelProps {
   /** Size of the panel */
   size?: PanelSize;
   /** Title displayed in the panel header */
-  title?: string;
+  title?: React.ReactNode;
   /** Z-index layer (higher = closer to front) */
   zIndex?: number;
   /** Panel contents */
