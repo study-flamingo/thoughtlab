@@ -18,6 +18,7 @@ interface Message {
  * Features:
  * - Real-time chat with LangGraph agent
  * - Message history context for conversation continuity
+ * - New Chat button to reset conversation
  * - Natural language node creation
  * - Context-aware responses
  * - Dark mode support
@@ -113,13 +114,36 @@ export default function AIChatPanel({ isOpen, onClose }: AIChatPanelProps) {
 
   const isLoading = chatMutation.isPending;
 
+  const handleNewChat = () => {
+    setMessages([
+      {
+        id: 'welcome',
+        role: 'assistant',
+        content: "Hello! I'm your AI research assistant. I can help you:\n\n• Create nodes from URLs\n• Find connections between ideas\n• Summarize and analyze content\n• Build your knowledge graph\n\nTry saying: 'Create a source from https://example.com/article'",
+        timestamp: new Date().toISOString(),
+      },
+    ]);
+    setInputValue('');
+  };
+
   return (
     <FloatingPanel
       isOpen={isOpen}
       onClose={onClose}
       position="bottom-right"
       size="lg"
-      title="AI Assistant"
+      title={
+        <div className="flex items-center justify-between w-full pr-8">
+          <span>AI Assistant</span>
+          <button
+            onClick={handleNewChat}
+            className="ml-4 text-xs px-2 py-1 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded transition-colors"
+            title="Start a new conversation"
+          >
+            New Chat
+          </button>
+        </div>
+      }
       zIndex={Z_INDEX.chat}
       className="!bottom-6 !right-6 h-[500px] max-h-[70vh]"
     >
