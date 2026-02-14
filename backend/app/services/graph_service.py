@@ -977,15 +977,14 @@ class GraphService:
         await self._ensure_neo4j()
         nodes_query = """
         MATCH (n)
-        WHERE n:Observation OR n:Hypothesis OR n:Source OR n:Entity OR n:Concept
+        WHERE n.id IS NOT NULL
         RETURN n, labels(n) as labels
         LIMIT $limit
         """
 
         edges_query = """
         MATCH (a)-[r]->(b)
-        WHERE (a:Observation OR a:Hypothesis OR a:Source OR a:Entity OR a:Concept)
-          AND (b:Observation OR b:Hypothesis OR b:Source OR b:Entity OR b:Concept)
+        WHERE a.id IS NOT NULL AND b.id IS NOT NULL
         RETURN a.id as source, b.id as target, type(r) as type, r.id as edge_id, properties(r) as props
         LIMIT $edges_limit
         """
