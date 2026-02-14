@@ -17,6 +17,7 @@ from app.models.tool_models import (
     SearchWebEvidenceResponse,
     MergeNodesResponse,
 )
+from app.models.nodes import NodeType
 
 logger = logging.getLogger(__name__)
 
@@ -57,8 +58,8 @@ class NodeModificationOperations(ToolServiceBase):
 
             old_type = node.get("type", "Unknown")
 
-            # Validate new type
-            valid_types = ["Observation", "Hypothesis", "Question", "Source", "Note"]
+            # Validate new type against NodeType enum
+            valid_types = [t.value for t in NodeType]
             if new_type not in valid_types:
                 return ReclassifyNodeResponse(
                     success=False,

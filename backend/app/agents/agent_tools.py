@@ -246,11 +246,11 @@ async def reclassify_node(
 ) -> str:
     """Change a node's type (e.g., Observation to Hypothesis).
 
-    Valid types: Observation, Hypothesis, Question, Source, Note
+    Valid types: Observation, Hypothesis, Source, Concept, Entity, Chunk
 
     Args:
         node_id: The ID of the node to reclassify
-        new_type: New type - Observation, Hypothesis, Question, Source, or Note
+        new_type: New type - must be one of the valid types above
         preserve_relationships: Keep existing relationships (default True)
 
     Returns:
