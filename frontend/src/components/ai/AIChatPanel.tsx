@@ -17,9 +17,11 @@ interface Message {
  *
  * Features:
  * - Real-time chat with LangGraph agent
+ * - Message history context for conversation continuity
  * - Natural language node creation
  * - Context-aware responses
  * - Dark mode support
+ * - Shift+Enter for newlines
  */
 export default function AIChatPanel({ isOpen, onClose }: AIChatPanelProps) {
   const [inputValue, setInputValue] = useState('');
@@ -32,6 +34,7 @@ export default function AIChatPanel({ isOpen, onClose }: AIChatPanelProps) {
     },
   ]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const queryClient = useQueryClient();
 
   // Auto-scroll to bottom when messages change
@@ -41,8 +44,8 @@ export default function AIChatPanel({ isOpen, onClose }: AIChatPanelProps) {
 
   // Chat mutation
   const chatMutation = useMutation({
-    mutationFn: async (message: string) => {
-      const response = await graphApi.sendChatMessage(message);
+    mutationFn: async ({ message, history }: { message: string; history: { role: 'user' | 'assistant'; content: string }[] }) => {
+      const response = await graphApi.sendChatMessage(message, history);
       return response.data;
     },
     onSuccess: (data) => {
@@ -71,8 +74,7 @@ export default function AIChatPanel({ isOpen, onClose }: AIChatPanelProps) {
     },
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = () => {
     if (!inputValue.trim()) return;
 
     // Add user message
@@ -84,11 +86,29 @@ export default function AIChatPanel({ isOpen, onClose }: AIChatPanelProps) {
     };
     setMessages((prev) => [...prev, userMessage]);
 
-    // Send to API
-    chatMutation.mutate(inputValue.trim());
+    // Convert messages to history format (exclude welcome message)
+    const history = messages
+      .filter(m => m.id !== 'welcome')
+      .map(m => ({ role: m.role, content: m.content }));
+
+    // Send to API with history
+    chatMutation.mutate({ message: inputValue.trim(), history });
 
     // Clear input
     setInputValue('');
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter') {
+      if (e.shiftKey) {
+        // Shift+Enter: allow newline (default behavior)
+        return;
+      } else {
+        // Enter only: submit
+        e.preventDefault();
+        handleSubmit();
+      }
+    }
   };
 
   const isLoading = chatMutation.isPending;
@@ -114,20 +134,23 @@ export default function AIChatPanel({ isOpen, onClose }: AIChatPanelProps) {
         </div>
 
         {/* Input Area */}
-        <form onSubmit={handleSubmit} className="p-4 border-t border-gray-200 dark:border-gray-700 bg-white/50 dark:bg-gray-800/50">
+        <div className="p-4 border-t border-gray-200 dark:border-gray-700 bg-white/50 dark:bg-gray-800/50">
           <div className="flex gap-2">
-            <input
-              type="text"
+            <textarea
+              ref={textareaRef}
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
+              onKeyDown={handleKeyDown}
               placeholder="Ask about your knowledge graph..."
               disabled={isLoading}
-              className="flex-1 px-4 py-2 text-sm bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50"
+              rows={1}
+              className="flex-1 px-4 py-2 text-sm bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50 resize-none min-h-[40px] max-h-[120px]"
+              style={{ overflowY: 'auto' }}
             />
             <button
-              type="submit"
+              onClick={handleSubmit}
               disabled={!inputValue.trim() || isLoading}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex-shrink-0"
             >
               {isLoading ? (
                 <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
@@ -142,9 +165,9 @@ export default function AIChatPanel({ isOpen, onClose }: AIChatPanelProps) {
             </button>
           </div>
           <p className="mt-2 text-xs text-gray-400 dark:text-gray-500">
-            Try: "Create a source from https://..." or "Find nodes about..."
+            Press Enter to send, Shift+Enter for newline
           </p>
-        </form>
+        </div>
       </div>
     </FloatingPanel>
   );

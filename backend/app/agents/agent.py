@@ -4,7 +4,7 @@ This agent can intelligently select and use tools to perform operations
 on the knowledge graph via the backend API.
 """
 
-from typing import Optional
+from typing import Optional, List
 from langchain_openai import ChatOpenAI
 from langgraph.prebuilt import create_react_agent
 from langgraph.graph import StateGraph
@@ -164,9 +164,56 @@ async def run_agent(
         print(response)
         ```
     """
+    return await run_agent_with_history(
+        agent=agent,
+        user_message=user_message,
+        history=[],
+        current_node_id=current_node_id,
+        current_edge_id=current_edge_id,
+    )
+
+
+async def run_agent_with_history(
+    agent: StateGraph,
+    user_message: str,
+    history: List[tuple] = None,
+    current_node_id: Optional[str] = None,
+    current_edge_id: Optional[str] = None,
+) -> str:
+    """Run the agent with chat history for context.
+
+    This function includes previous messages to maintain conversation context.
+
+    Args:
+        agent: The compiled LangGraph agent
+        user_message: The user's current request
+        history: List of (role, content) tuples representing previous messages
+        current_node_id: Optional node ID for context
+        current_edge_id: Optional edge ID for context
+
+    Returns:
+        The agent's final response as a string
+
+    Example:
+        ```python
+        agent = create_thoughtlab_agent()
+        response = await run_agent_with_history(
+            agent,
+            "What about that other node?",
+            history=[("user", "Hello"), ("assistant", "Hi!")]
+        )
+        print(response)
+        ```
+    """
+    if history is None:
+        history = []
+
+    # Build messages list with history + current message
+    messages = list(history) + [("user", user_message)]
+
     # Prepare initial state
     state = {
-        "messages": [("user", user_message)],
+        "messages": messages,
         "user_request": user_message,
         "current_node_id": current_node_id,
         "current_edge_id": current_edge_id,

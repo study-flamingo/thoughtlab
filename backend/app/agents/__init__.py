@@ -7,7 +7,7 @@ This module provides LangGraph agents that:
 """
 
 from app.agents.agent_tools import get_agent_tools, get_thoughtlab_tools
-from app.agents.agent import create_thoughtlab_agent, run_agent
+from app.agents.agent import create_thoughtlab_agent, run_agent, run_agent_with_history
 from app.agents.config import AgentConfig
 
 __all__ = [
@@ -15,5 +15,6 @@ __all__ = [
     "get_thoughtlab_tools",  # Legacy alias
     "create_thoughtlab_agent",
     "run_agent",
+    "run_agent_with_history",
     "AgentConfig",
 ]

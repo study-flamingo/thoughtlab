@@ -242,9 +242,10 @@ export const graphApi = {
 
   // === AI Chat ===
 
-  sendChatMessage: (message: string, context?: { currentNodeId?: string; currentEdgeId?: string }) =>
+  sendChatMessage: (message: string, history?: { role: 'user' | 'assistant'; content: string }[], context?: { currentNodeId?: string; currentEdgeId?: string }) =>
     api.post<{ response: string; session_id: string; actions: any[] }>('/chat', {
       message,
+      history: history || [],
       current_node_id: context?.currentNodeId,
       current_edge_id: context?.currentEdgeId,
     }),

@@ -5,11 +5,11 @@ ThoughtLab knowledge graph via the LangGraph agent.
 """
 
 import logging
-from typing import Optional
+from typing import Optional, List
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 
-from app.agents import create_thoughtlab_agent, run_agent
+from app.agents import create_thoughtlab_agent, run_agent_with_history
 from app.agents.config import AgentConfig
 
 logger = logging.getLogger(__name__)
@@ -17,9 +17,16 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/chat", tags=["chat"])
 
 
+class ChatMessage(BaseModel):
+    """A single message in the chat history."""
+    role: str  # 'user' or 'assistant'
+    content: str
+
+
 class ChatRequest(BaseModel):
     """Request body for chat endpoint."""
     message: str
+    history: List[ChatMessage] = []
     session_id: Optional[str] = None
     current_node_id: Optional[str] = None
     current_edge_id: Optional[str] = None
@@ -62,6 +69,10 @@ async def chat(request: ChatRequest):
         ```json
         {
             "message": "Create a source from https://example.com/article",
+            "history": [
+                {"role": "user", "content": "Hello"},
+                {"role": "assistant", "content": "Hi! How can I help?"}
+            ],
             "current_node_id": "optional-context-node"
         }
         ```
@@ -75,10 +86,14 @@ async def chat(request: ChatRequest):
                 detail="AI assistant not configured. Please set OPENAI_API_KEY."
             )
 
-        # Run the agent
-        response_text = await run_agent(
+        # Convert history to LangChain message format
+        history = [(msg.role, msg.content) for msg in request.history]
+
+        # Run the agent with history
+        response_text = await run_agent_with_history(
             agent=agent,
             user_message=request.message,
+            history=history,
             current_node_id=request.current_node_id,
             current_edge_id=request.current_edge_id,
         )
