@@ -71,7 +71,7 @@ export const graphApi = {
   createEntity: (data: { name: string; entity_type?: string; description?: string; links?: LinkItem[] }) =>
     api.post<{ id: string; message: string }>('/nodes/entities', data),
 
-  createSource: (data: { title: string; url?: string; source_type?: string; content?: string; published_date?: string; links?: LinkItem[] }) =>
+  createSource: (data: { title: string; url?: string; source_type?: string; content?: string; notes?: string; published_date?: string; links?: LinkItem[] }) =>
     api.post<{ id: string; message: string }>('/nodes/sources', data),
 
   createHypothesis: (data: { name: string; claim: string; status?: string; links?: LinkItem[] }) =>
@@ -94,7 +94,7 @@ export const graphApi = {
   updateConcept: (id: string, data: { name?: string; description?: string; domain?: string; links?: LinkItem[] }) =>
     api.put<{ id: string; message: string }>(`/nodes/concepts/${id}`, data),
 
-  updateSource: (id: string, data: { title?: string; url?: string; source_type?: string; content?: string; links?: LinkItem[] }) =>
+  updateSource: (id: string, data: { title?: string; url?: string; source_type?: string; content?: string; notes?: string; links?: LinkItem[] }) =>
     api.put<{ id: string; message: string }>(`/nodes/sources/${id}`, data),
 
   getObservation: (id: string) => api.get<GraphNode>(`/nodes/observations/${id}`),
