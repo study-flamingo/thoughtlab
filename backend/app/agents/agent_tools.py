@@ -246,7 +246,8 @@ async def reclassify_node(
 ) -> str:
     """Change a node's type (e.g., Observation to Hypothesis).
 
-    Valid types: Observation, Hypothesis, Source, Concept, Entity, Chunk
+    Valid types: Observation, Hypothesis, Source, Concept, Entity
+    (Note: Chunk is auto-generated and not user-reclassifiable)
 
     Args:
         node_id: The ID of the node to reclassify

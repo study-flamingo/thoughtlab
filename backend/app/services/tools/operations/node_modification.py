@@ -58,8 +58,8 @@ class NodeModificationOperations(ToolServiceBase):
 
             old_type = node.get("type", "Unknown")
 
-            # Validate new type against NodeType enum
-            valid_types = [t.value for t in NodeType]
+            # Validate new type - Chunk is auto-generated, not user-reclassifiable
+            valid_types = ["Observation", "Hypothesis", "Source", "Concept", "Entity"]
             if new_type not in valid_types:
                 return ReclassifyNodeResponse(
                     success=False,
