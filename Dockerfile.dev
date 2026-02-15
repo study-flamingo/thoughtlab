@@ -1,0 +1,48 @@
+# ThoughtLab Development Environment
+# Includes all CLI tools needed for development workflow
+
+FROM node:18-bullseye
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
+    curl \
+    ca-certificates \
+    gnupg \
+    lsb-release \
+    software-properties-common \
+    python3-pip \
+    python3-venv \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install GitHub CLI (gh)
+RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | \
+    dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg && \
+    chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg && \
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | \
+    tee /etc/apt/sources.list.d/github-cli.list > /dev/null && \
+    apt-get update && \
+    apt-get install -y gh && \
+    rm -rf /var/lib/apt/lists/*
+
+# Install Railway CLI
+RUN curl -fsSL https://railway.app/install.sh | sh
+ENV PATH="/root/.railway/bin:${PATH}"
+
+# Install Python dependencies for backend
+RUN pip3 install --no-cache-dir uv
+
+# Set working directory
+WORKDIR /workspace
+
+# Copy project files
+COPY . .
+
+# Install frontend dependencies
+RUN cd frontend && npm ci
+
+# Install backend dependencies
+RUN cd backend && uv pip install --system -e .
+
+# Default command - provides a shell for development
+CMD ["/bin/bash"]

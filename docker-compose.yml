@@ -112,6 +112,29 @@ services:
       retries: 5
       start_period: 30s
 
+  # Development environment with all CLI tools (gh, railway, git)
+  dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: thoughtlab-dev
+    volumes:
+      - .:/workspace
+      - ~/.gitconfig:/root/.gitconfig:ro
+      - ~/.ssh:/root/.ssh:ro
+      - ~/.config/gh:/root/.config/gh:ro
+      - ~/.railway:/root/.railway:ro
+    environment:
+      - GITHUB_TOKEN=${GITHUB_TOKEN:-}
+      - RAILWAY_TOKEN=${RAILWAY_TOKEN:-}
+    networks:
+      - thoughtlab-network
+    stdin_open: true
+    tty: true
+    profiles:
+      - dev
+    command: /bin/bash
+
 networks:
   thoughtlab-network:
     driver: bridge
