@@ -340,6 +340,53 @@ docker-compose ps                   # Check status
 
 ---
 
+## Development Environment
+
+### CLI Tools Container
+
+For consistent development with all necessary CLI tools (git, GitHub CLI, Railway CLI), use the development container:
+
+```bash
+# Enter dev environment with all tools
+./scripts/dev.sh
+
+# Inside the container - all tools available
+git status
+gh repo sync
+railway logs
+```
+
+**Why this exists:** Running `git` or `gh` through automated tools (like OpenClaw's exec) often fails because those tools don't have access to the host's SSH keys or GitHub credentials. The dev container mounts your host's credentials, so authentication works seamlessly.
+
+**What's included:**
+- `git` - Version control
+- `gh` - GitHub CLI (with your host's authentication)
+- `railway` - Railway deployment CLI
+- `node`/`npm` - Frontend tooling
+- `python`/`uv` - Backend tooling
+
+**Authentication:** The dev container automatically mounts:
+- `~/.gitconfig` - Git configuration
+- `~/.ssh` - SSH keys
+- `~/.config/gh` - GitHub CLI credentials
+- `~/.railway` - Railway credentials
+
+### Git Workflow
+
+1. **Enter dev environment:** `./scripts/dev.sh`
+2. **Make changes** to code
+3. **Test locally** before committing
+4. **Commit and push:**
+   ```bash
+   git add .
+   git commit -m "feat: description"
+   git push origin main
+   # or: gh repo sync
+   ```
+5. **Check Railway deployment:** `railway logs`
+
+---
+
 ## Getting Help
 
 - **Documentation**: Check DEVELOPMENT_GUIDE.md first
@@ -349,4 +396,4 @@ docker-compose ps                   # Check status
 
 ---
 
-**Last Updated**: 2026-01-02
+**Last Updated**: 2026-02-14
